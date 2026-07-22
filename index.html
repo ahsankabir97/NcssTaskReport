@@ -9,7 +9,7 @@
 <!-- FIREBASE -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getDatabase, ref, push, onValue, remove, set, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  import { getDatabase, ref, push, onValue, remove, set, get, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyAUoyHQ8f53OjLbYZCDQpVNmtwlk2Wov0c",
@@ -25,6 +25,62 @@
   const db = getDatabase(app);
   const ticketsRef = ref(db, 'tickets');
 const usersRef = ref(db, 'users');
+
+// ===== ONLINE / OFFLINE PRESENCE =====
+// NOTE: presence is stored INSIDE each user's existing record at users/{username}/presence
+// (not a brand-new top-level path) because the 'users' path is already proven writable/readable
+// by this app (used for create/reset-password). A new top-level path can silently fail if the
+// Firebase Realtime Database security rules only whitelist 'tickets' and 'users'.
+
+// Heartbeat: called every 5s while a user is logged in on this device
+window._fbHeartbeat = async function(username) {
+  try {
+    await set(ref(db, 'users/' + username + '/presence'), { online: true, ts: Date.now() });
+    return true;
+  } catch(e) {
+    console.error('[presence] heartbeat write failed for', username, '-', e.code || e.message || e);
+    return false;
+  }
+};
+
+// Marks a user offline immediately (called on manual logout)
+window._fbSetOffline = async function(username) {
+  try {
+    await set(ref(db, 'users/' + username + '/presence'), { online: false, ts: Date.now() });
+    return true;
+  } catch(e) {
+    console.error('[presence] set-offline write failed for', username, '-', e.code || e.message || e);
+    return false;
+  }
+};
+
+// Auto-mark offline if the browser/tab loses connection (crash, network drop, tab close)
+window._fbSetupPresenceDisconnect = function(username) {
+  try {
+    onDisconnect(ref(db, 'users/' + username + '/presence')).set({ online: false, ts: Date.now() });
+  } catch(e) {
+    console.error('[presence] onDisconnect setup failed for', username, '-', e.code || e.message || e);
+  }
+};
+
+// Read presence for all users at once (reuses the users node, so no extra permission needed)
+window._fbGetPresence = async function() {
+  try {
+    const snapshot = await get(usersRef);
+    const data = snapshot.val() || {};
+    const presence = {};
+    Object.entries(data).forEach(([uname, u]) => {
+      presence[uname] = (u && u.presence) ? u.presence : null;
+    });
+    return presence;
+  } catch(e) {
+    console.error('[presence] read failed -', e.code || e.message || e);
+    return {};
+  }
+};
+
+// Lets the main script know the Firebase module (and the presence functions above) has finished loading
+window._fbPresenceReady = true;
 
 window._fbSaveUser = async function(username, userData) {
   try {
@@ -537,7 +593,7 @@ tbody tr:hover td{background:#f0f8ff}
 
 /* USER TABLE */
 .um-table{width:100%;border-collapse:collapse}
-.um-table th{font-family:'Montserrat',sans-serif;font-size:.62rem;font-weight:800;color:#1a3a8f;text-transform:uppercase;letter-spacing:.5px;padding:6px 14px;background:linear-gradient(90deg,#e8f4fd,#f0f8ff);border-bottom:2px solid var(--border);border-right:1px solid var(--border);text-align:left;}
+.um-table th{font-family:'Montserrat',sans-serif;font-size:.62rem;font-weight:800;color:#1a3a8f;text-transform:uppercase;letter-spacing:.5px;padding:6px 14px;background:linear-gradient(90deg,#e8f4fd,#f0f8ff);border-bottom:2px solid var(--border);border-right:1px solid var(--border);text-align:center;}
 .um-table th:last-child{border-right:none}
 .um-table td{padding:6px 14px;border-bottom:1px solid var(--border);border-right:1px solid #eaf1fb;font-size:.8rem;color:var(--text);vertical-align:middle;font-family:'Outfit',sans-serif}
 .um-table td:last-child{border-right:none}
@@ -1436,6 +1492,43 @@ async function syncUsersFromFirebase() {
 }
 
 let currentUser = null;
+let presenceHeartbeatTimer = null;
+let usersPagePresenceTimer = null;
+
+// The presence functions live in a <script type="module"> which loads AFTER this classic
+// <script> runs, so calling window._fbHeartbeat etc. immediately on page load can hit them
+// before they exist. This retries for a few seconds until the module has finished loading.
+function fbReady(fnName, ...args) {
+  return new Promise((resolve) => {
+    let tries = 0;
+    (function attempt(){
+      if (typeof window[fnName] === 'function') {
+        resolve(window[fnName](...args));
+      } else if (tries++ < 50) {
+        setTimeout(attempt, 100);
+      } else {
+        console.error('[presence] ' + fnName + ' was never defined — Firebase module script may have failed to load');
+        resolve(null);
+      }
+    })();
+  });
+}
+
+// Starts sending an "online" heartbeat to Firebase every 5 seconds for the logged-in user
+function startPresenceHeartbeat() {
+  if (!currentUser) return;
+  fbReady('_fbHeartbeat', currentUser.username);
+  fbReady('_fbSetupPresenceDisconnect', currentUser.username);
+  if (presenceHeartbeatTimer) clearInterval(presenceHeartbeatTimer);
+  presenceHeartbeatTimer = setInterval(() => {
+    if (currentUser) fbReady('_fbHeartbeat', currentUser.username);
+  }, 5000);
+}
+
+// Stops the heartbeat (used on logout)
+function stopPresenceHeartbeat() {
+  if (presenceHeartbeatTimer) { clearInterval(presenceHeartbeatTimer); presenceHeartbeatTimer = null; }
+}
 
 async function doLogin() {
   const uname = document.getElementById('l-user').value.trim().toLowerCase();
@@ -1455,6 +1548,7 @@ async function doLogin() {
     setupUserUI();
     renderUserTable();
     setDateDefaults();
+    startPresenceHeartbeat();
   } else {
     err.classList.add('show');
     document.getElementById('l-pass').value = '';
@@ -1534,6 +1628,9 @@ if (zoneBadge) {
 
 
 function doLogout() {
+  if (currentUser) fbReady('_fbSetOffline', currentUser.username);
+  stopPresenceHeartbeat();
+  if (usersPagePresenceTimer) { clearInterval(usersPagePresenceTimer); usersPagePresenceTimer = null; }
   currentUser = null;
   localStorage.removeItem('l3_session');
   document.getElementById('app-screen').style.display = 'none';
@@ -1776,24 +1873,35 @@ async function savePassword() {
 // ===== USER TABLE (Admin) =====
 let resetTargetKey = null;
 
-function renderUserTable() {
+async function renderUserTable() {
   if (!currentUser || currentUser.role !== 'admin') return;
   const users = getUsers();
   const tb = document.getElementById('usr-tbody');
+  // Live presence: a user is Online if their last heartbeat says online AND it was
+  // sent recently (within 15s — 3x the 5s heartbeat interval, covers timing jitter).
+  const presence = await fbReady('_fbGetPresence') || {};
+  const isOnline = (uname) => {
+    const p = presence[uname];
+    if (!p || !p.online) return false;
+    return (Date.now() - (p.ts || 0)) < 15000;
+  };
   tb.innerHTML = Object.entries(users).map(([uname, u], i) => {
     const isMe = uname === currentUser.username;
     const isMainAdmin = uname === 'admin';
     const canDelete = !isMe && !isMainAdmin;
+    const online = isOnline(uname);
     return `<tr>
-      <td style="color:var(--muted);font-weight:700;font-family:'Montserrat',sans-serif">${i+1}</td>
-      <td style="font-weight:700;font-family:'Montserrat',sans-serif;color:var(--navy)">${u.name}</td>
-      <td style="font-family:'JetBrains Mono',monospace;color:var(--blue);font-size:.76rem;font-weight:600">${uname}</td>
+      <td style="color:var(--muted);font-weight:700">${i+1}</td>
+      <td style="font-weight:700;color:var(--navy)">${u.name}</td>
+      <td style="color:var(--blue);font-weight:600">${uname}</td>
       <td>${u.role==='admin'
         ?'<span class="um-badge-admin"><i class="fas fa-shield-alt"></i> Admin</span>'
         :'<span class="um-badge-eng"><i class="fas fa-hard-hat"></i> Engineer</span>'}</td>
-      <td><span class="chip chip-yes"><i class="fas fa-circle" style="font-size:.4rem;vertical-align:middle"></i> Active</span></td>
+      <td>${online
+        ?'<span class="chip chip-yes"><i class="fas fa-circle" style="font-size:.4rem;vertical-align:middle;color:#16a34a"></i> Online</span>'
+        :'<span class="chip chip-no"><i class="fas fa-circle" style="font-size:.4rem;vertical-align:middle;color:#94a3b8"></i> Offline</span>'}</td>
       <td>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center">
           <button onclick="openResetModal('${uname}','${u.name}')" style="background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff;border:none;padding:5px 12px;border-radius:7px;font-size:.65rem;font-weight:800;cursor:pointer;font-family:'Montserrat',sans-serif;display:flex;align-items:center;gap:5px;transition:filter .2s" onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''"><i class="fas fa-key"></i> Reset PW</button>
           ${canDelete ? `<button onclick="doDeleteUser('${uname}','${u.name}')" style="background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;border:none;padding:5px 12px;border-radius:7px;font-size:.65rem;font-weight:800;cursor:pointer;font-family:'Montserrat',sans-serif;display:flex;align-items:center;gap:5px;transition:filter .2s" onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''"><i class="fas fa-trash"></i> Delete</button>` : ''}
         </div>
@@ -2008,7 +2116,12 @@ function showPage(pg,el){
   if(pg==='alltask')renderAll();
   if(pg==='devices')renderDevices();
   if(pg==='wifi')renderWifi();
-  if(pg==='users')renderUserTable();
+  if (usersPagePresenceTimer) { clearInterval(usersPagePresenceTimer); usersPagePresenceTimer = null; }
+  if(pg==='users'){
+    renderUserTable();
+    // Refresh online/offline status every 5 seconds while this page is open
+    usersPagePresenceTimer = setInterval(renderUserTable, 5000);
+  }
   if(pg==='maindash'){
   document.getElementById('db-month').value = String(new Date().getMonth() + 1).padStart(2, '0');
   renderDash();
@@ -2992,6 +3105,7 @@ document.getElementById('l-user').addEventListener('keydown', e => { if(e.key===
     setupUserUI();
     renderUserTable();
     setDateDefaults();
+    startPresenceHeartbeat();
   } catch(e) {
     localStorage.removeItem('l3_session');
   }
