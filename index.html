@@ -46,6 +46,16 @@ window._fbGetUsers = async function() {
   }
 };
 
+window._fbDeleteUser = async function(username) {
+  try {
+    await remove(ref(db, 'users/' + username));
+    return true;
+  } catch(e) {
+    console.error(e);
+    return false;
+  }
+};
+
 window._fbInitUsers = async function(defaultUsers) {
   try {
     const snapshot = await get(usersRef);
@@ -449,14 +459,14 @@ input[type=date]::-webkit-calendar-picker-indicator{opacity:.7;cursor:pointer;fi
 .tbl-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:.78rem;table-layout:auto}
 thead tr{background:linear-gradient(90deg,#e8f4fd,#f0f8ff)}
-th{padding:4px 5px;text-align:center;font-weight:800;font-size:.65rem;color:#14532d;border-bottom:2px solid var(--border);border-right:1px solid var(--border);white-space:nowrap;letter-spacing:.2px;font-family:'Montserrat',sans-serif;text-transform:uppercase;text-shadow:none;box-shadow:none}
-td{padding:4px 5px;border-bottom:1px solid #eaf1fb;border-right:1px solid #eaf1fb;color:var(--navy);vertical-align:middle;font-size:.68rem;font-family:'Outfit',sans-serif;font-weight:600;white-space:nowrap;text-align:center}
+th{padding:1px 5px;text-align:center;font-weight:800;font-size:.65rem;color:#14532d;border-bottom:2px solid var(--border);border-right:1px solid var(--border);white-space:nowrap;letter-spacing:.2px;font-family:'Montserrat',sans-serif;text-transform:uppercase;text-shadow:none;box-shadow:none;line-height:1.3}
+td{padding:1px 5px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);color:var(--navy);vertical-align:middle;font-size:.68rem;font-family:'Outfit',sans-serif;font-weight:600;white-space:nowrap;text-align:center;line-height:1.2}
 tr:last-child td{border-bottom:none}
 tbody tr:hover td{background:#f0f8ff}
 #tr-summary-tbody tr:nth-child(even) td{background:rgba(232,244,253,0.5);}
 #tr-summary-tbody tr:nth-child(odd) td{background:#ffffff;}
 #tr-summary-tbody tr:hover td{background:rgba(33,150,243,0.08) !important;}
-.chip{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.65rem;font-weight:700;font-family:'Montserrat',sans-serif;letter-spacing:.3px}
+.chip{display:inline-block;padding:1px 10px;border-radius:20px;font-size:.65rem;font-weight:700;font-family:'Montserrat',sans-serif;letter-spacing:.3px}
 .remarks-preview{display:block;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;color:var(--text)}
 .remarks-preview:hover{color:var(--accent);text-decoration:underline}
 .chip-yes{background:#d1fae5;color:#065f46;border:1px solid #6ee7b7}
@@ -527,8 +537,10 @@ tbody tr:hover td{background:#f0f8ff}
 
 /* USER TABLE */
 .um-table{width:100%;border-collapse:collapse}
-.um-table th{font-family:'Montserrat',sans-serif;font-size:.62rem;font-weight:800;color:#1a3a8f;text-transform:uppercase;letter-spacing:.5px;padding:9px 14px;background:linear-gradient(90deg,#e8f4fd,#f0f8ff);border-bottom:2px solid var(--border);text-align:left;}
-.um-table td{padding:10px 14px;border-bottom:1px solid #eaf1fb;font-size:.8rem;color:var(--text);vertical-align:middle;font-family:'Outfit',sans-serif}
+.um-table th{font-family:'Montserrat',sans-serif;font-size:.62rem;font-weight:800;color:#1a3a8f;text-transform:uppercase;letter-spacing:.5px;padding:6px 14px;background:linear-gradient(90deg,#e8f4fd,#f0f8ff);border-bottom:2px solid var(--border);border-right:1px solid var(--border);text-align:left;}
+.um-table th:last-child{border-right:none}
+.um-table td{padding:6px 14px;border-bottom:1px solid var(--border);border-right:1px solid #eaf1fb;font-size:.8rem;color:var(--text);vertical-align:middle;font-family:'Outfit',sans-serif}
+.um-table td:last-child{border-right:none}
 .um-table tr:last-child td{border-bottom:none}
 .um-table tr:hover td{background:#f0f8ff}
 .um-badge-admin{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#0d1f5c,#1d4ed8);color:#fff;border-radius:20px;padding:2px 10px;font-size:.6rem;font-weight:800;font-family:'Montserrat',sans-serif;letter-spacing:.3px;}
@@ -735,7 +747,7 @@ tbody tr:hover td{background:#f0f8ff}
       </select>
     </div>
     <div class="modal-field"><label>Task Type</label>
-      <select id="te-tt">
+      <select id="te-tt" onchange="filterTeamByTaskTypeEdit(this.value)">
         <option value="Phone support">Phone support</option>
         <option value="Physical support">Physical support</option>
         <option value="Back office support">Back office support</option>
@@ -799,6 +811,11 @@ tbody tr:hover td{background:#f0f8ff}
     </a>
 <a href="https://ahsankabir97.github.io/ClientDatabase/" target="_blank" class="inv-float-circle" style="background:linear-gradient(145deg,#7c3aed,#a855f7)" title="Client Connection Management">
       <i class="fas fa-database"></i>
+    </a>
+  </div>
+  <div id="invIconDrop2" class="inv-drop-wrap">
+    <a href="https://ahsankabir97.github.io/SegunbagichaStore/" target="_blank" class="inv-float-circle inv-float-blue" title="Inventory Dashboard">
+      <i class="fas fa-boxes"></i>
     </a>
   </div>
 </div>
@@ -1488,11 +1505,15 @@ function setupUserUI() {
   }
 // Inventory popup - শুধু নির্দিষ্ট user দের জন্য
 const invUsers = ['admin', 'ahsan', 'tamim', 'amit', 'rupchan'];
+const invUsers2 = ['arifuzzaman', 'nazrul', 'sayed', 'maruf', 'test'];
 const zoneBadge = document.getElementById('zone-badge');
 if (zoneBadge) {
   if (invUsers.includes(u.username)) {
     zoneBadge.style.cursor = 'pointer';
     zoneBadge.onclick = toggleInvBtn;
+  } else if (invUsers2.includes(u.username)) {
+    zoneBadge.style.cursor = 'pointer';
+    zoneBadge.onclick = toggleInvBtn2;
   } else {
     zoneBadge.style.cursor = 'default';
     zoneBadge.onclick = null;
@@ -1665,6 +1686,7 @@ function openTicketFullEdit(fk){
   document.getElementById("te-cat").value = t.cat || "Troubleshoot";
   document.getElementById("te-tt").value = fmtTaskType(t.tt) || "Phone support";
   document.getElementById("te-tm").value = fmtTeam(t.tm) || "Engineer";
+  filterTeamByTaskTypeEdit(document.getElementById("te-tt").value);
   document.getElementById("te-eng").value = t.eng || "";
   document.getElementById("te-bnoc").value = t.bnoc === "YES" ? "YES" : "NO";
   document.getElementById("te-mac").value = t.mac || "";
@@ -1829,23 +1851,27 @@ async function doResetPW() {
   if(newP.length<4){errEl.textContent='❌ Password must be at least 4 characters!';errEl.style.display='block';return;}
   const users=getUsers();
   if(!resetTargetKey||!users[resetTargetKey]){closeResetModal();return;}
-  users[resetTargetKey].pass=newP;
-  if(currentUser.username===resetTargetKey) currentUser.pass=newP;
+  const targetKey = resetTargetKey;
+  users[targetKey].pass=newP;
+  if(currentUser.username===targetKey) currentUser.pass=newP;
   saveUsers(users);
   closeResetModal();
   toast('⏳ Password saving to Firebase...');
-  const ok = await window._fbSaveUser(resetTargetKey, users[resetTargetKey]);
+  const ok = await window._fbSaveUser(targetKey, users[targetKey]);
   if(ok) toast('✅ Password reset & saved to Firebase!');
   else toast('⚠ Locally saved, Firebase sync failed!');
 }
 
-function doDeleteUser(uname, displayName) {
+async function doDeleteUser(uname, displayName) {
   if(!confirm(`Delete user "${displayName}" (${uname})? This cannot be undone.`)) return;
   const users=getUsers();
   delete users[uname];
   saveUsers(users);
   renderUserTable();
-  toast(`🗑️ User "${displayName}" deleted.`);
+  toast('⏳ Deleting user from Firebase...');
+  const ok = await window._fbDeleteUser(uname);
+  if(ok) toast(`✅ User "${displayName}" deleted & synced to Firebase!`);
+  else toast(`⚠ Deleted locally, Firebase sync failed! (Will reappear on refresh)`);
 }
 
 // ===== TICKETS & FIREBASE =====
@@ -2054,6 +2080,65 @@ lbl.style.fontSize=val?'.85rem':'';
 lbl.style.fontFamily=val?'\'Outfit\',sans-serif':'';
   document.getElementById('cdd-'+key+'-list').style.display='none';
   document.getElementById('cdd-'+key+'-btn').classList.remove('open');
+  if(key==='tt'){ filterTeamByTaskType(val); }
+}
+// Task Type অনুযায়ী Team Type-এর অপশন filter করবে
+// Phone/Physical support হলে শুধু Engineer, Back office support হলে Single Technician ও FI Team
+function filterTeamByTaskType(tt){
+  let allowed;
+  if(tt==='Phone support'||tt==='Physical support'){
+    allowed=['Engineer'];
+  } else if(tt==='Back office support'){
+    allowed=['Single Technician','FI Team'];
+  } else {
+    allowed=['Engineer','Single Technician','FI Team'];
+  }
+  let currentVal=document.getElementById('f-team').value;
+  document.querySelectorAll('#cdd-tm-list .cdd-item').forEach(item=>{
+    const cb=item.querySelector('input');
+    if(allowed.includes(cb.value)){
+      item.style.display='';
+    } else {
+      item.style.display='none';
+      if(cb.checked)cb.checked=false;
+    }
+  });
+  if(currentVal && !allowed.includes(currentVal)){
+    currentVal='';
+  }
+  if(allowed.length===1){
+    currentVal=allowed[0];
+    const onlyCb=document.querySelector('#cdd-tm-list input[value="'+allowed[0]+'"]');
+    if(onlyCb)onlyCb.checked=true;
+  }
+  document.getElementById('f-team').value=currentVal;
+  const tmLbl=document.getElementById('cdd-tm-label');
+  tmLbl.textContent=currentVal||'Select Team Type';
+  tmLbl.style.color=currentVal?'var(--navy)':'';
+  tmLbl.style.fontWeight=currentVal?'900':'';
+  tmLbl.style.fontSize=currentVal?'.85rem':'';
+  tmLbl.style.fontFamily=currentVal?'\'Outfit\',sans-serif':'';
+}
+// Edit Ticket modal (native select) এর জন্য একই নিয়ম প্রয়োগ
+function filterTeamByTaskTypeEdit(tt){
+  const sel=document.getElementById('te-tm');
+  if(!sel)return;
+  let allowed;
+  if(tt==='Phone support'||tt==='Physical support'){
+    allowed=['Engineer'];
+  } else if(tt==='Back office support'){
+    allowed=['Single Technician','FI Team'];
+  } else {
+    allowed=['Engineer','Single Technician','FI Team'];
+  }
+  Array.from(sel.options).forEach(opt=>{
+    const ok=allowed.includes(opt.value);
+    opt.hidden=!ok;
+    opt.disabled=!ok;
+  });
+  if(!allowed.includes(sel.value)){
+    sel.value=allowed[0];
+  }
 }
 function resetCdd(key,placeholder){
   const nameMap={'cat':'cat','tt':'tasktype','tm':'team'};
@@ -2186,7 +2271,7 @@ function renderBnocCell(t) {
   }
   return `
     <div style="position:relative;display:inline-block">
-      <button onclick="openBnocEdit('${key}')" style="background:${t.bnoc==='YES'?'linear-gradient(135deg,#d1fae5,#a7f3d0)':'#f1f5f9'};border:1.5px solid ${t.bnoc==='YES'?'#6ee7b7':'#e2e8f0'};border-radius:20px;padding:2px 10px;font-size:.65rem;font-weight:700;font-family:'Montserrat',sans-serif;color:${t.bnoc==='YES'?'#065f46':'#5b7fa6'};cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .2s" title="Click to edit BNOC">
+      <button onclick="openBnocEdit('${key}')" style="background:${t.bnoc==='YES'?'linear-gradient(135deg,#d1fae5,#a7f3d0)':'#f1f5f9'};border:1.5px solid ${t.bnoc==='YES'?'#6ee7b7':'#e2e8f0'};border-radius:20px;padding:1px 10px;font-size:.65rem;font-weight:700;font-family:'Montserrat',sans-serif;color:${t.bnoc==='YES'?'#065f46':'#5b7fa6'};cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .2s" title="Click to edit BNOC">
         ${t.bnoc === 'YES' ? 'Ahsanul Kabir' : 'NO'}
         <i class="fas fa-pencil-alt" style="font-size:.5rem;opacity:.7"></i>
       </button>
@@ -2922,12 +3007,25 @@ function toggleInvBtn() {
     ? 'linear-gradient(90deg,rgba(33,150,243,.85),rgba(33,150,243,.4))'
     : '';
 }
+function toggleInvBtn2() {
+  const invUsers2 = ['arifuzzaman', 'nazrul', 'sayed', 'maruf', 'test'];
+  if (!currentUser || !invUsers2.includes(currentUser.username)) return;
+  const drop = document.getElementById('invIconDrop2');
+  const zone = document.getElementById('zone-badge');
+  if (!drop) return;
+  drop.classList.toggle('show');
+  zone.style.background = drop.classList.contains('show')
+    ? 'linear-gradient(90deg,rgba(33,150,243,.85),rgba(33,150,243,.4))'
+    : '';
+}
 
 document.addEventListener('click', function(e) {
   const zone = document.getElementById('zone-badge');
   const drop = document.getElementById('invIconDrop');
-  if (zone && drop && !zone.contains(e.target)) {
-    drop.classList.remove('show');
+  const drop2 = document.getElementById('invIconDrop2');
+  if (zone && !zone.contains(e.target)) {
+    if (drop) { drop.classList.remove('show'); }
+    if (drop2) { drop2.classList.remove('show'); }
     zone.style.background = '';
   }
 });
@@ -2941,7 +3039,7 @@ function toggleChartEmpty(id, isEmpty){
   if(el) el.classList.toggle("show", isEmpty);
 }
 const ENG_COLORS   = ['#185FA5','#0F6E56','#BA7517','#A32D2D','#534AB7','#0891b2','#3B6D11','#D4537E','#EA580C'];
-const CAT_COLORS   = {'Installation':'#185FA5','Troubleshoot':'#A32D2D','CR':'#BA7517','Survey':'#3B6D11','Non Ticket':'#534AB7'};
+const CAT_COLORS   = {'Installation':'#185FA5','Troubleshoot':'#A32D2D','CR':'#BA7517','Survey':'#3B6D11','Non Ticket':'#534AB7','BNOC Support':'#0E9488'};
 const TT_COLORS    = {'Phone support':'#0891b2','Physical support':'#185FA5','Back office support':'#534AB7'};
 
 function getDashFiltered(){
@@ -2993,7 +3091,8 @@ function renderDash(){
 
   // 1. Engineer wise bar chart
   const ahsanName = 'Ahsanul Kabir';
-const extraBnoc = arr.filter(t=>t.bnoc==='YES' && t.eng!==ahsanName).length;
+const extraBnocTickets = arr.filter(t=>t.bnoc==='YES' && t.eng!==ahsanName);
+const extraBnoc = extraBnocTickets.length;
 const engCounts = ENGINEERS.map(e=>{
   const et = arr.filter(t=>t.eng===e);
   const ts = et.filter(t=>t.cat==='Troubleshoot').length;
@@ -3065,6 +3164,12 @@ chartEng = new Chart(document.getElementById('chart-eng'),{
   // 2. Category donut chart
   const catLabels = cats.filter(c=>arr.filter(t=>t.cat===c).length>0);
   const catData   = catLabels.map(c=>arr.filter(t=>t.cat===c).length);
+  // BNOC Support: extra BNOC=YES tickets credited to Ahsanul Kabir (same logic as Engineer Wise chart)
+  // so that the donut total matches the Engineer Wise Tasks chart total
+  if(extraBnoc>0){
+    catLabels.push('BNOC Support');
+    catData.push(extraBnoc);
+  }
   const catColors = catLabels.map(c=>CAT_COLORS[c]||'#999');
   const catTotal = catData.reduce((a,b)=>a+b,0);
   document.getElementById('cc-total-cat').textContent = catTotal+' tasks';
@@ -3082,6 +3187,24 @@ chartCat = new Chart(document.getElementById('chart-cat'),{
       hoverBorderColor:'#fff'
     }]
   },
+  plugins:[{
+    id:'centerTextCat',
+    afterDraw(chart){
+      const {ctx,chartArea:{width,height,left,top}}=chart;
+      if(!width||!height)return;
+      const cx=left+width/2, cy=top+height/2;
+      ctx.save();
+      ctx.textAlign='center';
+      ctx.textBaseline='middle';
+      ctx.fillStyle='#0d1f5c';
+      ctx.font="800 17px 'Montserrat',sans-serif";
+      ctx.fillText(catTotal, cx, cy-9);
+      ctx.fillStyle='#5b7fa6';
+      ctx.font="700 9px 'Montserrat',sans-serif";
+      ctx.fillText('TOTAL', cx, cy+11);
+      ctx.restore();
+    }
+  }],
   options:{
     responsive:true,
     maintainAspectRatio:false,
@@ -3116,8 +3239,7 @@ chartCat = new Chart(document.getElementById('chart-cat'),{
         color:'#fff',
         font:{family:'Montserrat',size:10,weight:'800'},
         formatter:(v)=>{
-          const pct = catTotal ? Math.round(v/catTotal*100) : 0;
-          return pct>=8 ? pct+'%' : '';
+          return v>0 ? v : '';
         }
       }
     }
@@ -3127,6 +3249,8 @@ chartCat = new Chart(document.getElementById('chart-cat'),{
   // 3. Day wise line chart
   const dayMap={};
   arr.forEach(t=>{ dayMap[t.date]=(dayMap[t.date]||0)+1; });
+  // BNOC Support extra count added on its own date, so day-wise total matches other charts
+  extraBnocTickets.forEach(t=>{ dayMap[t.date]=(dayMap[t.date]||0)+1; });
   const dayKeys = Object.keys(dayMap).sort();
   const dayVals = dayKeys.map(k=>dayMap[k]);
   const dayLabels = dayKeys.map(d=>fmtDateDisp(d));
@@ -3140,16 +3264,26 @@ chartDay = new Chart(document.getElementById('chart-day'),{
     datasets:[{
       label:'Tasks/Day',
       data:dayVals,
-      borderColor:'#0e7490',
-      backgroundColor:'rgba(14,116,144,.12)',
+      borderColor:'#2f6fed',
+      backgroundColor:(ctx)=>{
+        const {chart}=ctx;
+        const {ctx:c,chartArea}=chart;
+        if(!chartArea) return 'rgba(47,111,237,.18)';
+        const g=c.createLinearGradient(0,chartArea.top,0,chartArea.bottom);
+        g.addColorStop(0,'rgba(47,111,237,.38)');
+        g.addColorStop(1,'rgba(47,111,237,.02)');
+        return g;
+      },
       fill:true,
-      tension:.35,
-      borderWidth:2.5,
-      pointBackgroundColor:'#0e7490',
-      pointBorderColor:'#fff',
-      pointBorderWidth:2,
-      pointRadius:4,
-      pointHoverRadius:7
+      tension:.4,
+      borderWidth:3,
+      pointBackgroundColor:'#fff',
+      pointBorderColor:'#2f6fed',
+      pointBorderWidth:2.5,
+      pointRadius:5,
+      pointHoverRadius:8,
+      pointHoverBackgroundColor:'#2f6fed',
+      pointHoverBorderColor:'#fff'
     }]
   },
   options:{
@@ -3166,8 +3300,8 @@ chartDay = new Chart(document.getElementById('chart-day'),{
       },
       datalabels:{
         display:true,
-        align:'top',anchor:'end',offset:6,
-        color:'#0e7490',font:{family:'Montserrat',size:9,weight:'800'},
+        align:'top',anchor:'end',offset:8,
+        color:'#0d1f5c',font:{family:'Montserrat',size:11,weight:'800'},
         formatter:v=>v>0?v:'',
         textShadowBlur:4,textShadowColor:'rgba(255,255,255,0.95)'
       }
@@ -3175,17 +3309,17 @@ chartDay = new Chart(document.getElementById('chart-day'),{
     scales:{
       y:{
         beginAtZero:true,
-        ticks:{stepSize:1, font:{family:'Outfit',size:11}, color:'#5b7fa6', precision:0},
-        grid:{color:'rgba(0,0,0,.06)'}
+        ticks:{ font:{family:'Outfit',size:11}, color:'#94a3b8', precision:0},
+        grid:{color:'rgba(0,0,0,.05)',drawBorder:false}
       },
       x:{
         ticks:{
-          font:{family:'Outfit',size:10},
+          font:{family:'Outfit',size:10,weight:'500'},
           color:'#5b7fa6',
-          maxRotation:40,
-          minRotation:30,
+          maxRotation:0,
+          minRotation:0,
           autoSkip:true,
-          maxTicksLimit:8
+          maxTicksLimit:12
         },
         grid:{display:false}
       }
@@ -3195,7 +3329,8 @@ chartDay = new Chart(document.getElementById('chart-day'),{
 
   // 4. Task type horizontal bar
   const ttList=['Phone support','Physical support','Back office support'];
-  const ttData = ttList.map(t=>arr.filter(r=>fmtTaskType(r.tt)===t).length);
+  // BNOC Support extra count added to its own task type, so task-type total matches other charts
+  const ttData = ttList.map(t=>arr.filter(r=>fmtTaskType(r.tt)===t).length + extraBnocTickets.filter(r=>fmtTaskType(r.tt)===t).length);
   const ttColors = ttList.map(t=>TT_COLORS[t]||'#999');
   const ttTotal = ttData.reduce((a,b)=>a+b,0);
   document.getElementById('cc-total-tt').textContent = ttTotal+' tasks';
@@ -3251,6 +3386,9 @@ chartTt = new Chart(document.getElementById('chart-tt'),{
   }
 });
 }
+
+// প্রতি 1 ঘণ্টা পর পর page auto refresh হবে
+setInterval(function(){ window.location.reload(); }, 60 * 60 * 1000);
 </script>
 </body>
 </html>
