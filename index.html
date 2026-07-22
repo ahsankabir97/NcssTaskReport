@@ -738,13 +738,13 @@ tbody tr:hover td{background:#f0f8ff}
       <select id="te-tt">
         <option value="Phone support">Phone support</option>
         <option value="Physical support">Physical support</option>
-        <option value="Back office support & Single Tech">Back office support & Single Tech</option>
+        <option value="Back office support">Back office support</option>
       </select>
     </div>
     <div class="modal-field"><label>Team Type</label>
       <select id="te-tm">
+        <option value="Engineer">Engineer</option>
         <option value="Single Technician">Single Technician</option>
-        <option value="Single Tech & Engineer">Single Tech & Engineer</option>
         <option value="FI Team">FI Team</option>
       </select>
     </div>
@@ -885,7 +885,7 @@ tbody tr:hover td{background:#f0f8ff}
 
       <select id="db-team" onchange="renderDash()" style="font-size:.76rem;padding:4px 10px;border:1.5px solid var(--border);border-radius:6px;height:30px;background:#e8f4fd;outline:none;font-family:'Outfit',sans-serif;font-weight:600;color:var(--navy)">
         <option value="">All Teams</option>
-        <option>Single Technician</option><option>Single Tech & Engineer</option><option>FI Team</option>
+        <option>Engineer</option><option>Single Technician</option><option>FI Team</option>
       </select>
 
       <select id="db-cat" onchange="renderDash()" style="font-size:.76rem;padding:4px 10px;border:1.5px solid var(--border);border-radius:6px;height:30px;background:#e8f4fd;outline:none;font-family:'Outfit',sans-serif;font-weight:600;color:var(--navy)">
@@ -897,7 +897,7 @@ tbody tr:hover td{background:#f0f8ff}
       <select id="db-tt" onchange="renderDash()" style="font-size:.76rem;padding:4px 10px;border:1.5px solid var(--border);border-radius:6px;height:30px;background:#e8f4fd;outline:none;font-family:'Outfit',sans-serif;font-weight:600;color:var(--navy)">
         <option value="">All Task Types</option>
         <option>Phone support</option><option>Physical support</option>
-        <option>Back office support & Single Tech</option>
+        <option>Back office support</option>
       </select>
 
       <button onclick="clearDashFilters()" style="padding:0 14px;height:30px;background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;border:none;border-radius:7px;font-size:.65rem;font-weight:800;cursor:pointer;font-family:'Montserrat',sans-serif;display:flex;align-items:center;gap:5px"><i class="fas fa-times"></i> Clear</button>
@@ -974,7 +974,7 @@ tbody tr:hover td{background:#f0f8ff}
               <div class="cdd-list" id="cdd-tt-list" style="display:none">
                 <label class="cdd-item"><input type="checkbox" name="f-tasktype" value="Phone support" onchange="pickCdd('tt',this)"><div class="cdd-check"></div><span>Phone support</span></label>
                 <label class="cdd-item"><input type="checkbox" name="f-tasktype" value="Physical support" onchange="pickCdd('tt',this)"><div class="cdd-check"></div><span>Physical support</span></label>
-                <label class="cdd-item"><input type="checkbox" name="f-tasktype" value="Back office support & Single Tech" onchange="pickCdd('tt',this)"><div class="cdd-check"></div><span>Back office support & Single Tech</span></label>
+                <label class="cdd-item"><input type="checkbox" name="f-tasktype" value="Back office support" onchange="pickCdd('tt',this)"><div class="cdd-check"></div><span>Back office support</span></label>
               </div>
             </div>
             <input type="hidden" id="f-tasktype" value="">
@@ -988,8 +988,8 @@ tbody tr:hover td{background:#f0f8ff}
                 <span class="cdd-arrow" id="cdd-tm-arrow">▼</span>
               </div>
               <div class="cdd-list" id="cdd-tm-list" style="display:none">
+                <label class="cdd-item"><input type="checkbox" name="f-team" value="Engineer" onchange="pickCdd('tm',this)"><div class="cdd-check"></div><span>Engineer</span></label>
                 <label class="cdd-item"><input type="checkbox" name="f-team" value="Single Technician" onchange="pickCdd('tm',this)"><div class="cdd-check"></div><span>Single Technician</span></label>
-                <label class="cdd-item"><input type="checkbox" name="f-team" value="Single Tech & Engineer" onchange="pickCdd('tm',this)"><div class="cdd-check"></div><span>Single Tech & Engineer</span></label>
                 <label class="cdd-item"><input type="checkbox" name="f-team" value="FI Team" onchange="pickCdd('tm',this)"><div class="cdd-check"></div><span>FI Team</span></label>
               </div>
             </div>
@@ -1302,10 +1302,7 @@ tbody tr:hover td{background:#f0f8ff}
       <div class="form-card" style="padding:14px 18px;margin-bottom:0;flex-shrink:0">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
           <div class="page-ttl" style="margin-bottom:0"><i class="fas fa-users-cog"></i>User Management</div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <button onclick="migrateOldLabels()" title="পুরনো ticket-এর 'Back office support for Tech' ও 'Engineer' লেবেল আপডেট করবে" style="background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff;border:none;padding:9px 20px;border-radius:9px;font-size:.75rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;letter-spacing:.5px;font-family:'Montserrat',sans-serif;box-shadow:0 4px 14px rgba(180,83,9,.3);transition:all .22s" onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''"><i class="fas fa-sync-alt"></i> Migrate Old Labels</button>
-            <button onclick="openCreateUser()" style="background:linear-gradient(135deg,#0d1f5c,#1d4ed8,#2196f3);color:#fff;border:none;padding:9px 20px;border-radius:9px;font-size:.75rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;letter-spacing:.5px;font-family:'Montserrat',sans-serif;box-shadow:0 4px 14px rgba(26,58,143,.3);transition:all .22s" onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''"><i class="fas fa-user-plus"></i> Create User</button>
-          </div>
+          <button onclick="openCreateUser()" style="background:linear-gradient(135deg,#0d1f5c,#1d4ed8,#2196f3);color:#fff;border:none;padding:9px 20px;border-radius:9px;font-size:.75rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;letter-spacing:.5px;font-family:'Montserrat',sans-serif;box-shadow:0 4px 14px rgba(26,58,143,.3);transition:all .22s" onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''"><i class="fas fa-user-plus"></i> Create User</button>
         </div>
       </div>
 
@@ -1666,8 +1663,8 @@ function openTicketFullEdit(fk){
   document.getElementById("te-date").value = t.date || "";
   document.getElementById("te-ticket").value = t.ticket || "";
   document.getElementById("te-cat").value = t.cat || "Troubleshoot";
-  document.getElementById("te-tt").value = t.tt || "Phone support";
-  document.getElementById("te-tm").value = t.tm || "Single Technician";
+  document.getElementById("te-tt").value = fmtTaskType(t.tt) || "Phone support";
+  document.getElementById("te-tm").value = fmtTeam(t.tm) || "Engineer";
   document.getElementById("te-eng").value = t.eng || "";
   document.getElementById("te-bnoc").value = t.bnoc === "YES" ? "YES" : "NO";
   document.getElementById("te-mac").value = t.mac || "";
@@ -1926,30 +1923,27 @@ function fmtDateDisp(iso){
   const year=p[0];
   return day+'-'+mon+'-'+year;
 }
-// Firebase push key এর প্রথম ৮ অক্ষর থেকে creation timestamp বের করা (real add time)
-function fbKeyToTime(key){
-  if(!key) return '';
-  const PUSH_CHARS='-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
-  let ts=0;
-  for(let i=0;i<8;i++){
-    const idx=PUSH_CHARS.indexOf(key.charAt(i));
-    if(idx<0) return '';
-    ts=ts*64+idx;
-  }
-  const d=new Date(ts);
-  if(isNaN(d.getTime())) return '';
+function fmtTimeDisp(id){
+  if(!id)return '';
+  const d=new Date(Number(id));
+  if(isNaN(d.getTime()))return '';
   let h=d.getHours();
-  const m=d.getMinutes();
-  const ampm=h>=12?'PM':'AM';
+  const m=String(d.getMinutes()).padStart(2,'0');
+  const ap=h>=12?'PM':'AM';
   h=h%12; if(h===0)h=12;
-  const mm=m<10?('0'+m):m;
-  return h+':'+mm+' '+ampm;
+  return h+':'+m+' '+ap;
 }
-// Date এর নিচে ছোট orange color এ time দেখানোর জন্য cell বানানো
-function fmtDateTimeCell(t){
-  const dateTxt = fmtDateDisp(t.date);
-  const timeTxt = fbKeyToTime(t.firebaseKey);
-  return `<div style="white-space:nowrap">${dateTxt}${timeTxt?`<div style="color:#f97316;font-size:.66rem;font-weight:700;margin-top:1px">${timeTxt}</div>`:''}</div>`;
+function fmtTaskType(tt){
+  if(tt==='Back office support for Tech') return 'Back office support';
+  return tt;
+}
+function fmtTeam(tm){
+  if(tm==='Single Tech & Engineer') return 'Single Technician';
+  return tm;
+}
+function dateTimeCell(t){
+  const tm=fmtTimeDisp(t.id);
+  return fmtDateDisp(t.date)+(tm?`<br><span style="color:#f97316;font-size:.62rem;font-weight:700">${tm}</span>`:'');
 }
 function setDateDefaults(){
   const today = new Date().toLocaleDateString('en-CA');
@@ -2271,11 +2265,11 @@ function buildRows(arr,tbodyId,withDel,isMyTask,startIdx=0){
     return `<tr>
     ${chkCell}
     <td>${startIdx+i+1}</td>
-    <td style="padding:5px 4px">${fmtDateTimeCell(t)}</td>
+    <td style="padding:5px 4px">${dateTimeCell(t)}</td>
     <td style="white-space:nowrap">${t.ticket}</td>
     <td><span class="chip chip-cat">${t.cat}</span></td>
-    <td>${t.tt}</td>
-    <td>${t.tm}</td>
+    <td>${fmtTaskType(t.tt)}</td>
+    <td>${fmtTeam(t.tm)}</td>
     <td style="color:var(--blue);font-weight:700">${t.eng}</td>
     <td id="bnoc-cell-${t.firebaseKey||t.id}">
       ${renderBnocCell(t)}
@@ -2290,31 +2284,6 @@ function buildRows(arr,tbodyId,withDel,isMyTask,startIdx=0){
     </tr>`;
   }).join('');
 }
-// পুরনো ticket গুলোর মধ্যে পুরনো Task Type / Team Type label থাকলে সেগুলোকে নতুন নামে Firebase-এ সরাসরি update করে
-async function migrateOldLabels(){
-  if(!currentUser || currentUser.role !== 'admin'){ toast('❌ শুধুমাত্র Admin এই migration চালাতে পারবে!'); return; }
-  const targets = tickets.filter(t => t.tt === 'Back office support for Tech' || t.tm === 'Engineer');
-  if(!targets.length){ toast('✅ Migrate করার মতো কোনো পুরনো ডাটা পাওয়া যায়নি।'); return; }
-  if(!confirm(`${targets.length}টি ticket পাওয়া গেছে যেগুলোতে পুরনো label আছে:\n\n"Back office support for Tech" → "Back office support & Single Tech"\n"Engineer" (Team Type) → "Single Technician"\n\nFirebase-এর আসল ডাটা সরাসরি update হবে (এটা ফিরিয়ে আনা যাবে না)। এগিয়ে যাবেন?`)) return;
-
-  try{
-    const { getDatabase, ref, update } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js");
-    const db = getDatabase();
-    let count = 0;
-    for(const t of targets){
-      const updates = {};
-      if(t.tt === 'Back office support for Tech') updates.tt = 'Back office support & Single Tech';
-      if(t.tm === 'Engineer') updates.tm = 'Single Technician';
-      await update(ref(db, 'tickets/' + t.firebaseKey), updates);
-      count++;
-    }
-    toast(`✅ Migration সম্পন্ন! ${count}টি ticket update হয়েছে।`);
-  }catch(e){
-    console.error(e);
-    toast('❌ Migration failed! Console এ error দেখুন।');
-  }
-}
-
 async function delTicket(fk, fromMyTask){
   if(fromMyTask){
     // My Task: user can only delete their own (already enforced by button visibility)
@@ -2601,7 +2570,7 @@ function renderAll(){
   const dt=document.getElementById('at-date-to').value;
   let arr=tickets.filter(t=>
     (!eng||t.eng===eng)&&
-    (!team||t.tm===team)&&
+    (!team||fmtTeam(t.tm)===team)&&
     (!cat||t.cat===cat)&&
     (!df||t.date>=df)&&
     (!dt||t.date<=dt)&&
@@ -2678,8 +2647,8 @@ function exportAtExcel(){
       fmtDateDisp(t.date),
       t.ticket,
       t.cat,
-      t.tt,
-      t.tm,
+      fmtTaskType(t.tt),
+      fmtTeam(t.tm),
       t.eng,
       t.bnoc,
       t.mac||'',
@@ -2718,7 +2687,7 @@ function getAtFilteredRows(){
   const dt=document.getElementById('at-date-to').value;
   return tickets.filter(t=>
     (!eng||t.eng===eng)&&
-    (!team||t.tm===team)&&
+    (!team||fmtTeam(t.tm)===team)&&
     (!cat||t.cat===cat)&&
     (!df||t.date>=df)&&
     (!dt||t.date<=dt)&&
@@ -2747,11 +2716,11 @@ if(dvTotal) dvTotal.textContent=arr.length;
   }
   tb.innerHTML=pageArr.map((t,i)=>`<tr>
     <td>${start+i+1}</td>
-    <td>${fmtDateTimeCell(t)}</td>
+    <td>${dateTimeCell(t)}</td>
     <td>${t.ticket}</td>
     <td>${t.mac}</td>
     <td>${t.eng}</td>
-    <td>${t.tm}</td>
+    <td>${fmtTeam(t.tm)}</td>
     <td>${adminEditBtn(t)}</td>
   </tr>`).join('');
   renderDvPagination(arr.length,totalPages);
@@ -2818,11 +2787,11 @@ if(wfTotal) wfTotal.textContent = arr.length;
   }
   tb.innerHTML=pageArr.map((t,i)=>`<tr>
     <td>${start+i+1}</td>
-    <td>${fmtDateTimeCell(t)}</td>
+    <td>${dateTimeCell(t)}</td>
     <td>${t.ticket}</td>
     <td><span class="chip chip-cat">${t.cat}</span></td>
     <td>${t.eng}</td>
-    <td>${t.tm}</td>
+    <td>${fmtTeam(t.tm)}</td>
     <td><span class="chip chip-yes"><i class="fas fa-circle" style="font-size:.4rem;vertical-align:middle"></i> YES</span></td>
     <td>${adminEditBtn(t)}</td>
   </tr>`).join('');
@@ -2973,7 +2942,7 @@ function toggleChartEmpty(id, isEmpty){
 }
 const ENG_COLORS   = ['#185FA5','#0F6E56','#BA7517','#A32D2D','#534AB7','#0891b2','#3B6D11','#D4537E','#EA580C'];
 const CAT_COLORS   = {'Installation':'#185FA5','Troubleshoot':'#A32D2D','CR':'#BA7517','Survey':'#3B6D11','Non Ticket':'#534AB7'};
-const TT_COLORS    = {'Phone support':'#0891b2','Physical support':'#185FA5','Back office support & Single Tech':'#534AB7'};
+const TT_COLORS    = {'Phone support':'#0891b2','Physical support':'#185FA5','Back office support':'#534AB7'};
 
 function getDashFiltered(){
   const month = document.getElementById('db-month').value;
@@ -2989,9 +2958,9 @@ function getDashFiltered(){
     if(df && t.date < df) return false;
     if(dt && t.date > dt) return false;
     if(eng  && t.eng !== eng)   return false;
-    if(team && t.tm  !== team)  return false;
+    if(team && fmtTeam(t.tm) !== team)  return false;
     if(cat  && t.cat !== cat)   return false;
-    if(tt   && t.tt  !== tt)    return false;
+    if(tt   && fmtTaskType(t.tt) !== tt)    return false;
     return true;
   });
 }
@@ -3225,8 +3194,8 @@ chartDay = new Chart(document.getElementById('chart-day'),{
 });
 
   // 4. Task type horizontal bar
-  const ttList=['Phone support','Physical support','Back office support & Single Tech'];
-  const ttData = ttList.map(t=>arr.filter(r=>r.tt===t).length);
+  const ttList=['Phone support','Physical support','Back office support'];
+  const ttData = ttList.map(t=>arr.filter(r=>fmtTaskType(r.tt)===t).length);
   const ttColors = ttList.map(t=>TT_COLORS[t]||'#999');
   const ttTotal = ttData.reduce((a,b)=>a+b,0);
   document.getElementById('cc-total-tt').textContent = ttTotal+' tasks';
@@ -3234,7 +3203,7 @@ chartDay = new Chart(document.getElementById('chart-day'),{
 chartTt = new Chart(document.getElementById('chart-tt'),{
   type:'bar',
   data:{
-    labels:['Phone support','Physical support','Back office support & Single Tech'],
+    labels:['Phone support','Physical support','Back office support'],
     datasets:[{
       label:'Tasks',
       data:ttData,
