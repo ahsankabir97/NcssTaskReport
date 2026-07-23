@@ -9,7 +9,7 @@
 <!-- FIREBASE -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getDatabase, ref, push, onValue, remove, set, get, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  import { getDatabase, ref, push, onValue, remove, set, get, onDisconnect, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyAUoyHQ8f53OjLbYZCDQpVNmtwlk2Wov0c",
@@ -25,6 +25,7 @@
   const db = getDatabase(app);
   const ticketsRef = ref(db, 'tickets');
 const usersRef = ref(db, 'users');
+const fiberTeamTicketsRef = ref(db, 'fiberTeamTickets');
 
 // ===== ONLINE / OFFLINE PRESENCE =====
 // NOTE: presence is stored INSIDE each user's existing record at users/{username}/presence
@@ -151,6 +152,20 @@ onValue(ticketsRef, (snapshot) => {
     updateFirebaseStatus(false);
   });
 
+onValue(fiberTeamTicketsRef, (snapshot) => {
+    const data = snapshot.val();
+    window.fiberTeamTickets = [];
+    if (data) {
+      Object.entries(data).forEach(([key, val]) => {
+        window.fiberTeamTickets.unshift({ ...val, firebaseKey: key });
+      });
+      window.fiberTeamTickets.sort((a, b) => (b.id || 0) - (a.id || 0));
+    }
+    if (typeof renderFiberTeamTickets === 'function') renderFiberTeamTickets();
+  }, (error) => {
+    console.error("Firebase error (fiberTeamTickets):", error);
+  });
+
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzLrnx5cLKn1jP1W4sEKdd1tWAaBePaLG4Z_7cke3-nZ5jcsGu61i6nWudG7mcPBXkb6Q/exec';
 
   window._fbPush = async function(ticketData, skipSheet = false) {
@@ -179,6 +194,60 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzLrnx5cLKn1jP1W4sEK
         }).catch(err => console.warn('Sheet sync failed:', err));
       }
 
+      return true;
+    } catch(e) {
+      console.error(e);
+      return false;
+    }
+  };
+
+  window._fbPushFiber = async function(fiberData) {
+    try {
+      await push(fiberTeamTicketsRef, fiberData);
+      return true;
+    } catch(e) {
+      console.error(e);
+      return false;
+    }
+  };
+
+  window._fbDeleteFiber = async function(firebaseKey) {
+    try {
+      await remove(ref(db, 'fiberTeamTickets/' + firebaseKey));
+      return true;
+    } catch(e) {
+      console.error(e);
+      return false;
+    }
+  };
+
+  window._fbSetFiberStatus = async function(firebaseKey, status) {
+    try {
+      await set(ref(db, 'fiberTeamTickets/' + firebaseKey + '/status'), status);
+      return true;
+    } catch(e) {
+      console.error(e);
+      return false;
+    }
+  };
+
+  // Pending করার সময় কারণ/মন্তব্য সহ status সেট হবে
+  window._fbSetFiberPending = async function(firebaseKey, comment) {
+    try {
+      await update(ref(db, 'fiberTeamTickets/' + firebaseKey), { status: 'pending', pendingComment: comment || '' });
+      return true;
+    } catch(e) {
+      console.error(e);
+      return false;
+    }
+  };
+
+  // "Done" চাপার পর ফর্ম সাবমিট সফল হলে এই ফাংশন কল হবে —
+  // রেকর্ড সাথে সাথে ডিলিট না করে status='done' + doneAt টাইমস্ট্যাম্প বসিয়ে দেওয়া হয়,
+  // যাতে রাত ১২টা না হওয়া পর্যন্ত Running Task Dashboard-এ পুরো row deep orange হয়ে দেখা যায়
+  window._fbMarkFiberDone = async function(firebaseKey) {
+    try {
+      await update(ref(db, 'fiberTeamTickets/' + firebaseKey), { status: 'done', doneAt: Date.now() });
       return true;
     } catch(e) {
       console.error(e);
@@ -222,7 +291,7 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzLrnx5cLKn1jP1W4sEK
   --navy:#0d1f5c;--blue:#1a3a8f;--blue2:#1d4ed8;--accent:#2196f3;
   --light:#e8f4fd;--lighter:#f0f8ff;--white:#fff;--gray:#e8f4fd;
   --text:#1a2340;--muted:#5b7fa6;--border:#bee3f8;
-  --green:#16a34a;--red:#dc2626;--nav-w:262px;
+  --green:#16a34a;--red:#dc2626;--nav-w:262px;--nav-w-collapsed:72px;
 }
 
 /* ===== LOGIN SCREEN ===== */
@@ -249,12 +318,27 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzLrnx5cLKn1jP1W4sEK
 .layout{display:flex;height:100vh;overflow:hidden}
 
 /* SIDEBAR */
-.sidebar{width:var(--nav-w);min-height:100vh;
+.sidebar{width:var(--nav-w);min-height:100vh;transition:width .25s ease;
   background:
     repeating-linear-gradient(90deg,rgba(255,255,255,.09) 0px,rgba(255,255,255,.09) 1px,transparent 1px,transparent 3px,rgba(0,0,0,.07) 3px,rgba(0,0,0,.07) 4px,transparent 4px,transparent 8px),
     repeating-linear-gradient(0deg,rgba(255,255,255,.05) 0px,rgba(255,255,255,.05) 1px,transparent 1px,transparent 5px,rgba(0,0,0,.04) 5px,rgba(0,0,0,.04) 6px,transparent 6px,transparent 10px),
     linear-gradient(180deg,#6ec6f0 0%,#2f8fd8 15%,#1a56ad 45%,#123f8f 70%,#0b2b6b 100%);
   display:flex;flex-direction:column;flex-shrink:0;position:relative;overflow:hidden;}
+/* ===== COLLAPSED (icon-only) SIDEBAR ===== */
+.sidebar.collapsed{width:var(--nav-w-collapsed);}
+.sidebar.collapsed .nav-label,
+.sidebar.collapsed .sb-logo-info,
+.sidebar.collapsed .sb-uname,
+.sidebar.collapsed .sb-urole,
+.sidebar.collapsed .sb-link span,
+.sidebar.collapsed .sb-prepared,
+.sidebar.collapsed #nav-running-count{display:none !important;}
+.sidebar.collapsed .sb-logo{justify-content:center;padding:12px 0;}
+.sidebar.collapsed .sb-user{justify-content:center;padding:8px 4px;margin:10px 4px 0;}
+.sidebar.collapsed .sb-avatar{margin:0}
+.sidebar.collapsed .nav-item{justify-content:center;gap:0;margin:1px 6px;padding:0;}
+.sidebar.collapsed .sb-link{justify-content:center;padding:0;gap:0}
+.sidebar.collapsed .sb-bottom{padding:4px 6px}
 .sidebar::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;}
 .sidebar::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.05) 0%,transparent 50%);pointer-events:none;z-index:0;}
 .sidebar>*{position:relative;z-index:1;}
@@ -321,6 +405,8 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzLrnx5cLKn1jP1W4sEK
 /* Active item static glow (no infinite pulse for a calmer, corporate feel) */
 
 .nav-item.admin-only{display:none}
+.nav-count-badge{margin-left:auto;flex-shrink:0;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;background:linear-gradient(135deg,#f87171,#ef4444,#dc2626);color:#fff;font-size:.72rem;line-height:20px;font-weight:800;border-radius:50%;font-family:'Montserrat',sans-serif;letter-spacing:0;text-align:center;box-shadow:0 0 0 2px rgba(255,255,255,.25),0 2px 6px rgba(220,38,38,.5);animation:navBadgePulse 1.8s ease-in-out infinite;}
+@keyframes navBadgePulse{0%,100%{transform:scale(1);box-shadow:0 0 0 2px rgba(255,255,255,.25),0 2px 6px rgba(220,38,38,.5)}50%{transform:scale(1.12);box-shadow:0 0 0 3px rgba(255,255,255,.35),0 2px 10px rgba(220,38,38,.75)}}
 .nav-item.eng-visible{display:none}
 .sb-bottom{padding:4px 10px;border-top:1px solid rgba(255,255,255,.18);flex-shrink:0;}
 .sb-link{margin:0;padding:0 10px;height:24px;display:flex;align-items:center;gap:8px;cursor:pointer;border-radius:11px;border:1px solid transparent;transition:all .22s;font-family:'Montserrat',sans-serif;font-size:.68rem;font-weight:700;color:#fff;}
@@ -391,12 +477,27 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzLrnx5cLKn1jP1W4sEK
 .fb-status.connected .fb-dot{background:#22c55e;animation:pulse 1.5s infinite}
 .fb-status.disconnected .fb-dot{background:#ef4444}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes rtBlink{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(249,115,22,.55)}50%{opacity:.55;box-shadow:0 0 0 4px rgba(249,115,22,.15)}}
+.rt-status-btn{border:1px solid rgba(0,0,0,.3);cursor:pointer;font-family:'Montserrat',sans-serif;font-weight:800;font-size:.52rem;padding:2px 5px;border-radius:4px;transition:all .2s;white-space:nowrap;line-height:1.4}
+.rt-running-live{background:#f97316 !important;color:#fff !important;animation:rtBlink 1.1s infinite}
+@keyframes rtRowBlink{0%,100%{background-color:rgba(249,115,22,.22)}50%{background-color:rgba(249,115,22,.42)}}
+#rt-tbody tr.rt-row-running{animation:rtRowBlink 1.1s infinite}
+#rt-tbody tr.rt-row-running td{color:var(--blue)}
+#rt-tbody tr.rt-row-pending{background-color:rgba(34,197,94,.14)}
+#rt-tbody tr.rt-row-pending td{color:var(--blue)}
+#rt-tbody tr.rt-row-done{background:linear-gradient(90deg,#7f1d1d,#b91c1c,#991b1b) !important;box-shadow:inset 4px 0 0 #7f1d1d}
+#rt-tbody tr.rt-row-done td{color:#fff5f5 !important;font-weight:600}
+#rt-tbody tr.rt-row-done td:first-child,
+#rt-tbody tr.rt-row-done td:nth-child(2){font-weight:800}
+#rt-tbody tr.rt-row-done .chip-cat{background:rgba(255,255,255,.16) !important;border-color:rgba(255,255,255,.35) !important;color:#fff5f5 !important}
+#rt-tbody tr.rt-row-done .rt-done-badge{background:#fff5f5 !important;color:#b91c1c !important;font-weight:800 !important;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+#rt-tbody tr.rt-row-done:hover td{background:transparent}
 .top-clock{text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:rgba(255,255,255,.14);border:1.5px solid rgba(255,255,255,.3);border-radius:16px;padding:6px 20px 8px;backdrop-filter:blur(4px)}
 .top-day{font-size:.92rem;color:#fff;font-weight:800;letter-spacing:.3px;font-family:'Montserrat',sans-serif;line-height:1.2}
 .top-date{font-size:.68rem;color:rgba(255,255,255,.85);font-weight:600;letter-spacing:.3px;font-family:'Outfit',sans-serif;line-height:1.2}
 
 .content{
-  flex:1;overflow-y:auto;padding:2px 16px 12px;display:flex;flex-direction:column;
+  flex:1;overflow-y:auto;padding:2px 10px 10px;display:flex;flex-direction:column;
   background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 36 36'%3E%3Crect width='36' height='36' fill='none'/%3E%3Cpath d='M18 0 L36 18 L18 36 L0 18 Z' fill='none' stroke='%2390b8b0' stroke-width='0.55' opacity='0.45'/%3E%3C/svg%3E") repeat center center / 36px 36px,linear-gradient(145deg,#eaf6f2 0%,#e4f2f8 50%,#dceef6 100%);
 }
 .page{display:none;flex:1;flex-direction:column;}.page.active{display:flex;}
@@ -430,6 +531,10 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzLrnx5cLKn1jP1W4sEK
 #page-wifi .tbl-wrap{flex:1;overflow-x:auto;overflow-y:auto;}
 
 /* FORM CARD */
+.dash-tabs{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.dash-tab-btn{display:flex;align-items:center;gap:8px;padding:10px 18px;border-radius:10px;border:1.5px solid var(--border);background:rgba(235,245,255,.75);color:var(--muted);font-weight:700;font-size:.75rem;font-family:'Outfit',sans-serif;cursor:pointer;transition:all .2s;box-shadow:0 3px 10px rgba(26,58,143,.08)}
+.dash-tab-btn:hover{border-color:var(--accent);color:var(--text)}
+.dash-tab-btn.active{background:linear-gradient(135deg,#0d1f5c,#1d4ed8,#2196f3);color:#fff;border-color:transparent;box-shadow:0 5px 16px rgba(26,58,143,.32)}
 .form-card{background:#fff;border-radius:16px;border:1px solid rgba(190,227,248,.75);padding:30px 18px 14px 18px;box-shadow:0 6px 20px rgba(26,58,143,.10);position:relative;overflow:hidden;margin-bottom:10px;margin-top:4px}
 .form-card::before{content:'';position:absolute;top:0;left:0;right:0;height:8px;background:linear-gradient(90deg,#0d1f5c,#1d4ed8,#2196f3,#64b5f6)}
 .form-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px 14px}
@@ -515,13 +620,16 @@ input[type=date]::-webkit-calendar-picker-indicator{opacity:.7;cursor:pointer;fi
 .tbl-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:.78rem;table-layout:auto}
 thead tr{background:linear-gradient(90deg,#e8f4fd,#f0f8ff)}
-th{padding:1px 5px;text-align:center;font-weight:800;font-size:.65rem;color:#14532d;border-bottom:2px solid var(--border);border-right:1px solid var(--border);white-space:nowrap;letter-spacing:.2px;font-family:'Montserrat',sans-serif;text-transform:uppercase;text-shadow:none;box-shadow:none;line-height:1.3}
+th{padding:1px 5px;text-align:center;font-weight:900;font-size:.65rem;color:#15803d;border-bottom:2px solid var(--border);border-right:1px solid var(--border);white-space:nowrap;letter-spacing:.3px;font-family:'Montserrat',sans-serif;text-transform:uppercase;text-shadow:0 1px 1px rgba(255,255,255,.7);box-shadow:none;line-height:1.3}
 td{padding:1px 5px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);color:var(--navy);vertical-align:middle;font-size:.68rem;font-family:'Outfit',sans-serif;font-weight:600;white-space:nowrap;text-align:center;line-height:1.2}
 tr:last-child td{border-bottom:none}
 tbody tr:hover td{background:#f0f8ff}
 #tr-summary-tbody tr:nth-child(even) td{background:rgba(232,244,253,0.5);}
 #tr-summary-tbody tr:nth-child(odd) td{background:#ffffff;}
 #tr-summary-tbody tr:hover td{background:rgba(33,150,243,0.08) !important;}
+#tr-tech-tbody tr:nth-child(even) td{background:rgba(255,237,213,0.4);}
+#tr-tech-tbody tr:nth-child(odd) td{background:#ffffff;}
+#tr-tech-tbody tr:hover td{background:rgba(249,115,22,0.08) !important;}
 .chip{display:inline-block;padding:1px 10px;border-radius:20px;font-size:.65rem;font-weight:700;font-family:'Montserrat',sans-serif;letter-spacing:.3px}
 .remarks-preview{display:block;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;color:var(--text)}
 .remarks-preview:hover{color:var(--accent);text-decoration:underline}
@@ -654,7 +762,13 @@ tbody tr:hover td{background:#f0f8ff}
 #page-alltask .tbl-card,
 #page-devices .tbl-card,
 #page-wifi .tbl-card,
+#page-runningtask .tbl-card,
 #page-mytask .form-card{padding:8px 18px !important;margin-top:4px !important;}
+#page-runningtask .form-card{padding:6px 14px !important;margin-top:2px !important;margin-bottom:8px !important;}
+#page-runningtask .tbl-top{padding:8px 14px !important;}
+#rt-tbody td{font-size:.7rem !important;}
+#rt-tbody td *:not(.rt-status-btn){font-size:.7rem !important;}
+#rt-tbody td{padding:2px 5px !important;}
 #page-taskreport .form-card{padding:8px 18px !important;margin-top:4px !important;}
 #page-alltask .form-card,
 #page-devices .form-card,
@@ -668,6 +782,8 @@ tbody tr:hover td{background:#f0f8ff}
 #page-mytask .tbl-top{display:none;}
 #tr-summary-tbody td{padding:0px 2px !important;line-height:1.2;}
 #tr-summary-tbody tr td span{width:14px;height:14px;font-size:.58rem;}
+#tr-tech-tbody td{padding:0px 2px !important;line-height:1.2;}
+#tr-tech-tbody tr td span{width:14px;height:14px;font-size:.58rem;}
 #page-alltask .tbl-top{display:none !important;}
 .fg label{font-weight:900 !important;font-size:.72rem !important;color:var(--navy) !important;letter-spacing:.8px !important;}
 .fg input,.fg select,.fg textarea{font-weight:800 !important;color:var(--navy) !important;font-size:.85rem !important;}
@@ -683,7 +799,16 @@ tbody tr:hover td{background:#f0f8ff}
 #sidebar-backdrop.show{display:block}
 @media (max-width:900px){
   #mobile-menu-btn{display:flex !important}
+  #desktop-collapse-btn{display:none !important}
   .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:999;transform:translateX(-100%);transition:transform .28s ease;box-shadow:0 0 40px rgba(0,0,0,.4);width:min(var(--nav-w),82vw);}
+  .sidebar.collapsed{width:min(var(--nav-w),82vw);}
+  .sidebar.collapsed .nav-label,
+  .sidebar.collapsed .sb-logo-info,
+  .sidebar.collapsed .sb-uname,
+  .sidebar.collapsed .sb-urole,
+  .sidebar.collapsed .sb-link span,
+  .sidebar.collapsed .sb-prepared,
+  .sidebar.collapsed #nav-running-count{display:revert !important;}
   .sidebar.mobile-open{transform:translateX(0);}
   .top-bar{padding:0 12px;height:64px;gap:8px}
   .top-title{font-size:1.05rem;letter-spacing:1px}
@@ -887,16 +1012,17 @@ tbody tr:hover td{background:#f0f8ff}
   </div>
   <nav class="sb-nav">
     <div class="nav-sec"></div>
-    <div class="nav-item" onclick="showPage('maindash',this)"><div class="nav-icon-wrap"><i class="fas fa-tachometer-alt"></i></div><span class="nav-label">Dashboard</span></div>
-<div class="nav-item active" onclick="showPage('dashboard',this)"><div class="nav-icon-wrap"><i class="fas fa-ticket-alt"></i></div><span class="nav-label">Ticket Entry</span></div>
-    <div class="nav-item" onclick="showPage('mytask',this)"><div class="nav-icon-wrap"><i class="fas fa-calendar-check"></i></div><span class="nav-label">My Task</span></div>
-    <div class="nav-item" onclick="showPage('taskreport',this)"><div class="nav-icon-wrap"><i class="fas fa-chart-bar"></i></div><span class="nav-label">Task Report</span></div>
-    <div class="nav-item eng-visible" id="nav-alltask" onclick="showPage('alltask',this)"><div class="nav-icon-wrap"><i class="fas fa-clipboard-list"></i></div><span class="nav-label">All Completed Tasks</span></div>
-    <div class="nav-item eng-visible" id="nav-devices" onclick="showPage('devices',this)"><div class="nav-icon-wrap"><i class="fas fa-network-wired"></i></div><span class="nav-label">Used Devices</span></div>
-    <div class="nav-item eng-visible" id="nav-wifi" onclick="showPage('wifi',this)"><div class="nav-icon-wrap"><i class="fas fa-wifi"></i></div><span class="nav-label">WiFi Scoring</span></div>
-<div class="nav-item admin-only" id="nav-import" onclick="showPage('import',this)">
+    <div class="nav-item" title="Dashboard" onclick="showPage('maindash',this)"><div class="nav-icon-wrap"><i class="fas fa-tachometer-alt"></i></div><span class="nav-label">Dashboard</span></div>
+<div class="nav-item active" title="Ticket Entry" onclick="showPage('dashboard',this)"><div class="nav-icon-wrap"><i class="fas fa-ticket-alt"></i></div><span class="nav-label">Ticket Entry</span></div>
+    <div class="nav-item" title="Fiber Task" onclick="showPage('runningtask',this)"><div class="nav-icon-wrap"><i class="fas fa-tasks"></i></div><span class="nav-label">Fiber Task</span><span id="nav-running-count" class="nav-count-badge" style="display:none">0</span></div>
+    <div class="nav-item" title="My Task" onclick="showPage('mytask',this)"><div class="nav-icon-wrap"><i class="fas fa-calendar-check"></i></div><span class="nav-label">My Task</span></div>
+    <div class="nav-item" title="Task Report" onclick="showPage('taskreport',this)"><div class="nav-icon-wrap"><i class="fas fa-chart-bar"></i></div><span class="nav-label">Task Report</span></div>
+    <div class="nav-item eng-visible" id="nav-alltask" title="All Completed Tasks" onclick="showPage('alltask',this)"><div class="nav-icon-wrap"><i class="fas fa-clipboard-list"></i></div><span class="nav-label">All Completed Tasks</span></div>
+    <div class="nav-item eng-visible" id="nav-devices" title="Used Devices" onclick="showPage('devices',this)"><div class="nav-icon-wrap"><i class="fas fa-network-wired"></i></div><span class="nav-label">Used Devices</span></div>
+    <div class="nav-item eng-visible" id="nav-wifi" title="WiFi Scoring" onclick="showPage('wifi',this)"><div class="nav-icon-wrap"><i class="fas fa-wifi"></i></div><span class="nav-label">WiFi Scoring</span></div>
+<div class="nav-item admin-only" id="nav-import" title="Import Data" onclick="showPage('import',this)">
 <div class="nav-icon-wrap"><i class="fas fa-file-import"></i></div><span class="nav-label">Import Data</span></div>
-    <div class="nav-item admin-only" id="nav-users" onclick="showPage('users',this)"><div class="nav-icon-wrap"><i class="fas fa-users-cog"></i></div><span class="nav-label">User Management</span></div>
+    <div class="nav-item admin-only" id="nav-users" title="User Management" onclick="showPage('users',this)"><div class="nav-icon-wrap"><i class="fas fa-users-cog"></i></div><span class="nav-label">User Management</span></div>
     <div class="nav-sep"></div>
   </nav>
   <div class="sb-bottom">
@@ -910,6 +1036,7 @@ tbody tr:hover td{background:#f0f8ff}
  <div class="top-bar">
     <div style="position:absolute;inset:0;z-index:0;pointer-events:none;background:linear-gradient(90deg,rgba(10,20,80,.75) 0%,rgba(10,20,80,0) 18%,rgba(10,20,80,0) 82%,rgba(10,20,80,.75) 100%);"></div>
     <button id="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="Menu" style="display:none;position:relative;z-index:2;background:rgba(255,255,255,.16);border:1.5px solid rgba(255,255,255,.35);border-radius:8px;width:38px;height:38px;color:#fff;font-size:1.05rem;cursor:pointer;flex-shrink:0;align-items:center;justify-content:center"><i class="fas fa-bars"></i></button>
+    <button id="desktop-collapse-btn" onclick="toggleSidebarCollapse()" aria-label="Toggle Navigation" title="Toggle Navigation" style="position:relative;z-index:2;background:rgba(255,255,255,.16);border:1.5px solid rgba(255,255,255,.35);border-radius:8px;width:38px;height:38px;color:#fff;font-size:1.05rem;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-right:10px"><i class="fas fa-bars" id="desktop-collapse-icon"></i></button>
     <div class="top-title-wrap" style="z-index:1;">
       <div class="top-title" id="topTitle">Daily Work Dashboard</div>
       <div class="top-sub"><span style="color:rgba(255,255,255,.95);text-shadow:0 2px 10px rgba(0,0,0,.6),0 4px 20px rgba(0,0,0,.4)">MOTIJHEEL</span> <span style="color:rgba(255,255,255,.95);text-shadow:0 2px 10px rgba(0,0,0,.6),0 4px 20px rgba(0,0,0,.4)">ZONE</span></div>
@@ -1014,6 +1141,11 @@ tbody tr:hover td{background:#f0f8ff}
 </div>
     <!-- DASHBOARD -->
     <div class="page active" id="page-dashboard">
+      <div class="dash-tabs">
+        <button type="button" class="dash-tab-btn active" id="dashtab-daily-btn" onclick="switchDashTab('daily')"><i class="fas fa-ticket-alt"></i> Daily Ticket Entry</button>
+        <button type="button" class="dash-tab-btn" id="dashtab-fiber-btn" onclick="switchDashTab('fiber')"><i class="fas fa-network-wired"></i> Fiber Team Ticket</button>
+      </div>
+      <div class="dash-subtab" id="dashsub-daily">
       <div class="form-card">
         <div class="form-grid">
           <div class="fg"><label><i class="fas fa-calendar-alt"></i>Work Date</label><input type="date" id="f-date"></div>
@@ -1083,6 +1215,24 @@ tbody tr:hover td{background:#f0f8ff}
               <option>Abu Sayed</option>
             </select>
           </div>
+          <div class="fg"><label><i class="fas fa-user-hard-hat"></i>Assigned Technician (Optional)</label>
+            <select id="f-tech">
+              <option value="">Select Technician</option>
+              <option>Rone</option>
+              <option>Milon</option>
+              <option>Raju</option>
+              <option>Tipu</option>
+              <option>Alamin</option>
+              <option>Rabin</option>
+              <option>Maruf</option>
+              <option>Alal</option>
+              <option>Sujon</option>
+              <option>A.Latif</option>
+              <option>Ibrahim</option>
+              <option>Ratul</option>
+              <option>Nazmul</option>
+            </select>
+          </div>
           <div class="fg"><label><i class="fas fa-headset"></i>BNOC/Backend Support</label>
             <button type="button" class="toggle-single is-no" id="btn-bnoc" onclick="toggleSingle('bnoc')">
               <span class="ts-val" id="ts-bnoc-val">NO</span>
@@ -1108,6 +1258,131 @@ tbody tr:hover td{background:#f0f8ff}
           <div class="ncss-tag"><i class="fas fa-certificate"></i> NCSS Team (CEx)</div>
           <button class="btn-submit" onclick="submitTicket()"><i class="fas fa-paper-plane"></i> Submit Done Tickets</button>
         </div>
+      </div>
+      </div>
+
+      <!-- FIBER TEAM TICKET -->
+      <div class="dash-subtab" id="dashsub-fiber" style="display:none">
+      <div class="form-card">
+        <div class="form-grid">
+          <div class="fg fg-full">
+            <label><i class="fas fa-paste"></i>Paste Ticket Data (auto-fill)</label>
+            <textarea id="ft-pastebox" placeholder="এখানে সিস্টেম থেকে কপি করা পুরো লাইনটা পেস্ট করুন... Ticket ID, Client Code, Client Name, Client Category, Date, Area, Phone Number আপনা-আপনি বসে যাবে।" rows="3" oninput="autoFillFiberTicket()"></textarea>
+          </div>
+          <div class="fg"><label><i class="fas fa-hashtag"></i>Ticket ID</label>
+            <input type="text" id="ft-tki" placeholder="Enter Ticket ID">
+          </div>
+          <div class="fg"><label><i class="fas fa-id-badge"></i>Client Code</label>
+            <input type="text" id="ft-clientcode" placeholder="Enter Client Code">
+          </div>
+          <div class="fg"><label><i class="fas fa-user"></i>Client Name</label>
+            <input type="text" id="ft-clientname" placeholder="Enter Client Name">
+          </div>
+          <div class="fg fg-full"><label><i class="fas fa-map-marker-alt"></i>Address</label>
+            <input type="text" id="ft-address" placeholder="Enter Client Address">
+          </div>
+          <div class="fg"><label><i class="fas fa-phone"></i>Contact</label>
+            <input type="text" id="ft-contact" placeholder="Enter Contact Number">
+          </div>
+          <div class="fg"><label><i class="fas fa-layer-group"></i>Client Category</label>
+            <select id="ft-clientcat">
+              <option value="">Select Client Category</option>
+              <option>Corporate</option>
+              <option>Home User</option>
+              <option>SME / Business</option>
+              <option>VIP</option>
+              <option>Reseller</option>
+              <option>RETAIL (HOME)</option>
+              <option>BANK</option>
+            </select>
+          </div>
+          <div class="fg"><label><i class="fas fa-calendar-alt"></i>Forward/Last Update Date</label>
+            <input type="text" id="ft-fwddate" placeholder="dd/mm/yyyy hh:mm:ss AM/PM" readonly>
+          </div>
+          <div class="fg"><label><i class="fas fa-map"></i>Area</label>
+            <input type="text" id="ft-area" list="ft-area-list" placeholder="Enter/Select Area">
+            <datalist id="ft-area-list">
+              <option value="Moghbazar">
+              <option value="Dhanmondi">
+              <option value="Gulshan">
+              <option value="Banani">
+              <option value="Uttara">
+              <option value="Mirpur">
+              <option value="Mohammadpur">
+              <option value="Badda">
+            </datalist>
+          </div>
+          <div class="fg"><label><i class="fas fa-user-cog"></i>Assigned Engineer</label>
+            <select id="ft-assigneng">
+              <option value="">Select Engineer</option>
+              <option>Ahsanul Kabir</option>
+              <option>Tamim</option>
+              <option>Nazrul Islam</option>
+              <option>Rupchan</option>
+              <option>Amit Hasan</option>
+              <option>Basudeb Roy</option>
+              <option>ATM Arifuzzaman</option>
+              <option>Maruf Hasan</option>
+              <option>Abu Sayed</option>
+            </select>
+          </div>
+          <div class="fg"><label><i class="fas fa-user-hard-hat"></i>Assigned Technician</label>
+            <select id="ft-assigntech">
+              <option value="">Select Technician</option>
+              <option>Rone</option>
+              <option>Milon</option>
+              <option>Raju</option>
+              <option>Tipu</option>
+              <option>Alamin</option>
+              <option>Rabin</option>
+              <option>Maruf</option>
+              <option>Alal</option>
+              <option>Sujon</option>
+              <option>A.Latif</option>
+              <option>Ibrahim</option>
+              <option>Ratul</option>
+              <option>Nazmul</option>
+            </select>
+          </div>
+        </div>
+        <div class="submit-row">
+          <div class="ncss-tag"><i class="fas fa-certificate"></i> Fiber Team</div>
+          <button class="btn-submit" onclick="submitFiberTeamTicket()"><i class="fas fa-paper-plane"></i> Submit Fiber Team Ticket</button>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <!-- RUNNING TASK DASHBOARD -->
+    <div class="page" id="page-runningtask">
+      <div class="form-card" style="padding:14px 18px;margin-bottom:12px">
+        <div class="page-header" style="margin-bottom:0">
+          <div class="page-ttl"><i class="fas fa-tasks"></i>Fiber Task</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="tbl-badge" id="rt-cnt">0 running</span>
+          </div>
+        </div>
+      </div>
+      <div class="tbl-card">
+        <div class="tbl-top">
+          <span class="tbl-title"><i class="fas fa-network-wired"></i>Fiber Team — Running Tasks</span>
+        </div>
+        <div class="tbl-wrap"><table>
+          <thead><tr>
+  <th>#</th>
+  <th>Ticket ID</th>
+  <th>Client Code</th>
+  <th>Client Name</th>
+  <th>Contact</th>
+  <th>Category</th>
+  <th>Area</th>
+  <th>Forward Time</th>
+  <th>Assigned Eng</th>
+  <th>Assigned Tech</th>
+  <th>Action</th>
+</tr></thead>
+          <tbody id="rt-tbody"></tbody>
+        </table></div>
       </div>
     </div>
 
@@ -1174,10 +1449,14 @@ tbody tr:hover td{background:#f0f8ff}
             <input type="date" id="tr-dt" oninput="renderReport()" style="font-size:.76rem;height:30px;padding:4px 10px;border:1.5px solid var(--border);border-radius:6px;background:#e8f4fd;outline:none;font-weight:800;font-family:'Montserrat',sans-serif;color:var(--navy)">
           </div>
         </div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button id="tr-tab-eng" onclick="switchReportView('eng')" style="border:none;cursor:pointer;font-family:'Montserrat',sans-serif;font-weight:800;font-size:.78rem;padding:8px 18px;border-radius:8px;background:linear-gradient(135deg,#0d1f5c,#2196f3);color:#fff;box-shadow:0 3px 8px rgba(33,150,243,.3)"><i class="fas fa-user-cog"></i>&nbsp;Engineer Task Report</button>
+          <button id="tr-tab-tech" onclick="switchReportView('tech')" style="border:none;cursor:pointer;font-family:'Montserrat',sans-serif;font-weight:800;font-size:.78rem;padding:8px 18px;border-radius:8px;background:#eef3fb;color:#334155"><i class="fas fa-user-hard-hat"></i>&nbsp;Technician Task Report</button>
+        </div>
       </div>
 
       <!-- Engineer Summary Table (the main report badge) -->
-      <div class="tbl-card">
+      <div class="tbl-card" id="tr-view-eng">
         <div class="tbl-top" style="background:linear-gradient(90deg,#0d1f5c,#1a3a8f,#2196f3)">
           <span class="tbl-title" style="color:#fff;font-size:.88rem;font-weight:900;letter-spacing:.5px"><i class="fas fa-users"></i>&nbsp;Engineer Task Summary</span>
           <span id="tr-period-badge" style="font-size:.72rem;font-family:'Montserrat',sans-serif;font-weight:900;color:#ffd54f;letter-spacing:.5px;white-space:nowrap">—</span>
@@ -1198,6 +1477,28 @@ tbody tr:hover td{background:#f0f8ff}
               </tr>
             </thead>
             <tbody id="tr-summary-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Technician Summary Table -->
+      <div class="tbl-card" id="tr-view-tech" style="display:none">
+        <div class="tbl-top" style="background:linear-gradient(90deg,#7c2d12,#c2410c,#f97316)">
+          <span class="tbl-title" style="color:#fff;font-size:.88rem;font-weight:900;letter-spacing:.5px"><i class="fas fa-user-hard-hat"></i>&nbsp;Technician Task Summary</span>
+          <span id="tr-tech-period-badge" style="font-size:.72rem;font-family:'Montserrat',sans-serif;font-weight:900;color:#ffd54f;letter-spacing:.5px;white-space:nowrap">—</span>
+        </div>
+        <div class="tbl-wrap">
+          <table style="min-width:520px">
+            <thead>
+              <tr style="background:linear-gradient(90deg,#7c2d12,#c2410c)">
+                <th style="color:#fff;border-bottom:2px solid rgba(255,255,255,.25);min-width:150px;text-align:center;font-family:'Montserrat',sans-serif;font-size:.78rem;letter-spacing:.3px">Technician Name</th>
+                <th style="color:#fff;border-bottom:2px solid rgba(255,255,255,.25);text-align:center;font-family:'Montserrat',sans-serif;font-size:.72rem">Troubleshoot</th>
+                <th style="color:#fff;border-bottom:2px solid rgba(255,255,255,.25);text-align:center;font-family:'Montserrat',sans-serif;font-size:.72rem">CR</th>
+                <th style="color:#fff;border-bottom:2px solid rgba(255,255,255,.25);text-align:center;font-family:'Montserrat',sans-serif;font-size:.72rem">Installation</th>
+                <th style="color:#fff;border-bottom:2px solid rgba(255,255,255,.25);text-align:center;font-family:'Montserrat',sans-serif;font-size:.72rem">Total</th>
+              </tr>
+            </thead>
+            <tbody id="tr-tech-tbody"></tbody>
           </table>
         </div>
       </div>
@@ -1624,6 +1925,20 @@ if (zoneBadge) {
  const toggleSelBtn = document.getElementById('btn-toggle-sel');
   if(toggleSelBtn) toggleSelBtn.style.display = canBulkDelete() ? 'flex' : 'none';
 
+  // ===== Ticket Entry default sub-tab + Technician Task Report visibility (per user) =====
+  const dailyDefaultUsers = ['rupchan','amit','tamim'];
+  const fiberDefaultUsers = ['nazrul','maruf','sayed','arifuzzaman'];
+  const techReportBtn = document.getElementById('tr-tab-tech');
+  if (dailyDefaultUsers.includes(u.username)) {
+    switchDashTab('daily');
+    if (techReportBtn) techReportBtn.style.display = 'none';
+  } else if (fiberDefaultUsers.includes(u.username)) {
+    switchDashTab('fiber');
+    if (techReportBtn) techReportBtn.style.display = '';
+  } else {
+    if (techReportBtn) techReportBtn.style.display = '';
+  }
+
 } // ← setupUserUI এর closing bracket
 
 
@@ -1986,7 +2301,7 @@ async function doDeleteUser(uname, displayName) {
 let tickets = [];
 
 const titles = {
-  maindash:'Dashboard', dashboard:'Ticket Entry', mytask:'My Task', taskreport:'Task Report',
+  maindash:'Dashboard', dashboard:'Ticket Entry', runningtask:'Fiber Task', mytask:'My Task', taskreport:'Task Report',
   alltask:'All Completed Tasks', devices:'Used Devices', wifi:'WiFi Scoring',
   users:'User Management', import:'Import Data'
 };
@@ -2111,6 +2426,7 @@ function showPage(pg,el){
   const ht=document.getElementById('topTitle');
   ht.style.opacity='0';
   setTimeout(()=>{ht.textContent=titles[pg]||'Daily Work Dashboard';ht.style.opacity='1';},150);
+  if(pg==='runningtask')renderFiberTeamTickets();
   if(pg==='mytask')renderMyTask();
   if(pg==='taskreport'){setThisMonth();renderReport();}
   if(pg==='alltask')renderAll();
@@ -2137,6 +2453,42 @@ function toggleMobileSidebar(force){
   sb.classList.toggle('mobile-open', show);
   if(bd) bd.classList.toggle('show', show);
 }
+
+// ===== SIDEBAR COLLAPSE (icon-only) — desktop এ নেভিগেশন বার auto hide/collapse হয়ে শুধু আইকন দেখাবে =====
+// আইকনের উপর hover করলে title tooltip-এ পুরো নামটা দেখা যাবে
+function toggleSidebarCollapse(force){
+  const sb = document.getElementById('app-sidebar');
+  if(!sb) return;
+  const collapsed = typeof force === 'boolean' ? force : !sb.classList.contains('collapsed');
+  sb.classList.toggle('collapsed', collapsed);
+  const icon = document.getElementById('desktop-collapse-icon');
+  if(icon){ icon.className = collapsed ? 'fas fa-angle-double-right' : 'fas fa-bars'; }
+  try{ localStorage.setItem('navCollapsed', collapsed ? '1' : '0'); }catch(e){}
+}
+(function initSidebarCollapse(){
+  function apply(){
+    if(window.innerWidth <= 900) return; // মোবাইলে এই ফিচার প্রযোজ্য না, ওখানে আলাদা off-canvas মেনু আছে
+    let saved = null;
+    try{ saved = localStorage.getItem('navCollapsed'); }catch(e){}
+    // ডিফল্টভাবে (কোনো preference সেভ না থাকলে) নেভিগেশন বার auto collapse হয়ে থাকবে — শুধু আইকন দেখাবে
+    const collapsed = saved === null ? true : saved === '1';
+    toggleSidebarCollapse(collapsed);
+  }
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', apply);
+  } else {
+    apply();
+  }
+  window.addEventListener('resize', function(){
+    const sb = document.getElementById('app-sidebar');
+    if(!sb) return;
+    if(window.innerWidth <= 900){
+      sb.classList.remove('collapsed');
+    } else {
+      apply();
+    }
+  });
+})();
 
 function toast(msg){
   const t=document.getElementById('toast');
@@ -2270,6 +2622,430 @@ document.addEventListener('click',function(e){
   });
 });
 
+// ===== TICKET ENTRY SUB-TABS (Daily / Fiber Team) =====
+function switchDashTab(tab){
+  const daily = document.getElementById('dashsub-daily');
+  const fiber = document.getElementById('dashsub-fiber');
+  const dailyBtn = document.getElementById('dashtab-daily-btn');
+  const fiberBtn = document.getElementById('dashtab-fiber-btn');
+  if(tab==='fiber'){
+    daily.style.display='none'; fiber.style.display='';
+    fiberBtn.classList.add('active'); dailyBtn.classList.remove('active');
+  } else {
+    fiber.style.display='none'; daily.style.display='';
+    dailyBtn.classList.add('active'); fiberBtn.classList.remove('active');
+  }
+}
+
+// ===== AUTO-FILL FIBER TEAM TICKET FROM PASTED TEXT =====
+// System থেকে কপি করা tab-separated লাইন থেকে Ticket ID, Client Code, Client Name,
+// Client Category, Forward/Last Update Date, Area ও Phone Number বের করে ফর্মে বসিয়ে দেয়।
+function autoFillFiberTicket(){
+  const raw = document.getElementById('ft-pastebox').value;
+  if(!raw || !raw.trim()) return;
+
+  // 1) Ticket ID (Ticket ID) — L3-22Jul26-039473, TKI220726AF55000155, CR-22Jul26-0190047 — সবগুলো ফরম্যাটই handle করবে
+  const idMatch = raw.match(/L3-[A-Za-z0-9]+-\d+|CR-[A-Za-z0-9]+-\d+|TKI[A-Za-z0-9]+/);
+  if(idMatch) document.getElementById('ft-tki').value = idMatch[0];
+
+  // Split into tab-separated columns (empty columns removed, order preserved)
+  const cols = raw.split('\t').map(c=>c.trim()).filter(c=>c.length>0);
+
+  // 2) Client Category কলাম খুঁজে বের করা — known category list এর সাথে match করবে
+  // Client Name সবসময় Client Category-র ঠিক আগ পর্যন্ত যা থাকবে, তা পুরোটাই (কোনো কোলন split ছাড়া) নেবে
+  const CATEGORY_KEYWORDS = ['Corporate','Home User','SME / Business','VIP','Reseller','RETAIL (HOME)','BANK'];
+  let clientCatCandidate = '';
+  let catIdx = -1;
+  for(let i=0;i<cols.length;i++){
+    if(CATEGORY_KEYWORDS.some(c=>c.toLowerCase()===cols[i].trim().toLowerCase())){
+      catIdx = i;
+      clientCatCandidate = cols[i].trim();
+      break;
+    }
+  }
+
+  if(catIdx > 0){
+    const nameCol = cols[catIdx-1];
+    // পুরনো ফরম্যাট: code+name একই কলামে "333995:1:NAME:NAME" অথবা "00019:198:Janata Bank PLC:Shyampur Branch (Dhaka)"
+    // ID কোড দুইটার (code:code) পরের পুরো অংশটাই Client Name — যদি একই নাম দুইবার ডুপ্লিকেট থাকে (NAME:NAME) তাহলে একবারই নেবে
+    const m4 = nameCol.match(/^(\d{3,10}):(\d+):(.+)$/);
+    if(m4){
+      document.getElementById('ft-clientcode').value = m4[1] + ':' + m4[2];
+      const restParts4 = m4[3].split(':').map(p=>p.trim()).filter(p=>p.length>0);
+      const uniqueParts4 = [...new Set(restParts4)];
+      document.getElementById('ft-clientname').value = uniqueParts4.length===1 ? uniqueParts4[0] : m4[3].trim();
+    } else {
+      // নতুন ফরম্যাট: Code ও Name আলাদা কলামে — Name কলামের পুরো টেক্সট (colon থাকলেও) হুবহু নেবে
+      document.getElementById('ft-clientname').value = nameCol.trim();
+      if(catIdx-2 >= 0 && /^[\d:]+$/.test(cols[catIdx-2].trim())){
+        document.getElementById('ft-clientcode').value = cols[catIdx-2].trim();
+      }
+    }
+  } else {
+    // Fallback: known category না মিললে পুরনো পদ্ধতিতে খুঁজবে
+    for(let i=0;i<cols.length;i++){
+      const m = cols[i].match(/^(\d{3,10}):(\d+):(.+)$/);
+      if(m){
+        document.getElementById('ft-clientcode').value = m[1] + ':' + m[2];
+        const restPartsF = m[3].split(':').map(p=>p.trim()).filter(p=>p.length>0);
+        const uniquePartsF = [...new Set(restPartsF)];
+        document.getElementById('ft-clientname').value = uniquePartsF.length===1 ? uniquePartsF[0] : m[3].trim();
+        clientCatCandidate = cols[i+1] ? cols[i+1].trim() : '';
+        break;
+      }
+    }
+
+    // নতুন ফরম্যাট: Ticket ID কলামের ঠিক পরের কলামে "Name,Address" অথবা "Name,N/A" থাকে —
+    // যেমন: CR-22Jul26-0190047 → R. N. Trading Limited,Chawak bazar Extension Office (পুরোটাই নাম হিসেবে নেবে)
+    //       TKI220726AF55000155 → MD SHAHIDUL ISLAM,N/A (N/A বাদ দিয়ে শুধু নামটুকু নেবে)
+    if(!document.getElementById('ft-clientname').value.trim() && idMatch){
+      const tkiIdx = cols.findIndex(c => c === idMatch[0]);
+      if(tkiIdx >= 0 && cols[tkiIdx+1]){
+        const nameField = cols[tkiIdx+1];
+        const commaIdx = nameField.indexOf(',');
+        if(commaIdx === -1){
+          document.getElementById('ft-clientname').value = nameField.trim();
+        } else {
+          const namePart = nameField.slice(0, commaIdx).trim();
+          const restPart = nameField.slice(commaIdx+1).trim();
+          document.getElementById('ft-clientname').value = (!restPart || restPart.toLowerCase()==='n/a') ? namePart : nameField.trim();
+        }
+      }
+    }
+  }
+
+  // 3) Client Category — set to matching option if it exists, else add it
+  if(clientCatCandidate){
+    const sel = document.getElementById('ft-clientcat');
+    let found = Array.from(sel.options).some(o=>o.value.toLowerCase()===clientCatCandidate.toLowerCase());
+    if(!found){
+      const opt = document.createElement('option');
+      opt.value = clientCatCandidate; opt.textContent = clientCatCandidate;
+      sel.appendChild(opt);
+    }
+    sel.value = Array.from(sel.options).find(o=>o.value.toLowerCase()===clientCatCandidate.toLowerCase())?.value || clientCatCandidate;
+  }
+
+  // 4) Phone Number — Bangladeshi mobile pattern, bracket/dash/country-code সব ফরম্যাট handle করবে
+  // যেমন: (01896057156), 01896-057156, +880 1896 057156, 8801896057156 ইত্যাদি
+  const phoneMatch = raw.match(/(?:\+?880[\s-]?|0)1[0-9](?:[\s-]?\d){8}/);
+  if(phoneMatch){
+    let digits = phoneMatch[0].replace(/\D/g,'');
+    if(digits.startsWith('880')) digits = '0'+digits.slice(3);
+    document.getElementById('ft-contact').value = digits;
+  } else {
+    // পেস্ট করা ডেটায় কোনো ফোন নাম্বার পাওয়া না গেলে "N/A" auto-select হয়ে যাবে
+    document.getElementById('ft-contact').value = 'N/A';
+  }
+
+  // 5) Forward/Last Update Date — dd/mm/yyyy h:mm:ss AM/PM
+  // পেস্ট করা লাইনে সাধারণত ২টা সময় থাকে (ticket time + last-update time)।
+  // ২য়টা (index 1) কে ধরবে, আর date + time দুটোই এই box-এ hubohu বসবে।
+  const dateMatches = raw.match(/\d{2}\/\d{2}\/\d{4}\s+\d{1,2}:\d{2}:\d{2}\s*[AP]M/g);
+  if(dateMatches && dateMatches.length){
+    const picked = dateMatches.length>=2 ? dateMatches[1] : dateMatches[0];
+    document.getElementById('ft-fwddate').value = picked.replace(/\s+/g,' ').trim();
+  }
+
+  // 6) Area — last non-empty tab-column, usually "Area:Area"
+  if(cols.length){
+    const last = cols[cols.length-1];
+    const am = last.match(/^([^:]+):(.+)$/);
+    document.getElementById('ft-area').value = am ? am[1].trim() : last;
+  }
+}
+
+async function submitFiberTeamTicket(){
+  const tki = document.getElementById('ft-tki').value.trim();
+  const clientCode = document.getElementById('ft-clientcode').value.trim();
+  const clientName = document.getElementById('ft-clientname').value.trim();
+  const address = document.getElementById('ft-address').value.trim();
+  const contact = document.getElementById('ft-contact').value.trim();
+  const clientCat = document.getElementById('ft-clientcat').value;
+  const fwdDate = document.getElementById('ft-fwddate').value;
+  const area = document.getElementById('ft-area').value.trim();
+  const assignEng = document.getElementById('ft-assigneng').value;
+  const assignTech = document.getElementById('ft-assigntech').value;
+
+  if(!tki||!clientCode||!clientName||!address||!contact||!clientCat||!fwdDate||!area||!assignEng||!assignTech){
+    toast('⚠ Please fill all required fields!');
+    return;
+  }
+
+  const btn=document.querySelector('#dashsub-fiber .btn-submit');
+  btn.disabled=true;
+  btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+  const fiberData={
+    id:Date.now()+Math.random(),
+    tki, clientCode, clientName, address, contact,
+    clientCat, fwdDate, area, assignEng, assignTech,
+    status:'pending',
+    submittedBy: currentUser ? currentUser.username : 'unknown'
+  };
+
+  const ok=await window._fbPushFiber(fiberData);
+
+  btn.disabled=false;
+  btn.innerHTML='<i class="fas fa-paper-plane"></i> Submit Fiber Team Ticket';
+
+  if(ok){
+    toast('✅ Fiber Team Ticket saved successfully!');
+    ['ft-tki','ft-clientcode','ft-clientname','ft-address','ft-contact','ft-area','ft-pastebox'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('ft-clientcat').value='';
+    document.getElementById('ft-fwddate').value='';
+    document.getElementById('ft-assigneng').value='';
+    document.getElementById('ft-assigntech').value='';
+  } else {
+    toast('❌ Failed to save Fiber Team Ticket! Check connection.');
+  }
+}
+
+// ===== RUNNING TASK DASHBOARD (Fiber Team) =====
+function escapeHtml(str){
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// যেভাবেই data entry করা হোক না কেন (সব ক্যাপিটাল/সব ছোট হাতের অক্ষর), display করার সময়
+// প্রতিটা শব্দের প্রথম অক্ষর বড়, বাকিটা ছোট হাতের অক্ষরে দেখানোর জন্য এই helper
+function toTitleCase(str){
+  if(!str) return str;
+  return String(str).toLowerCase().replace(/(^|[\s\-\/(])([a-z\u0980-\u09FF])/g, (m,p1,p2)=>p1+p2.toUpperCase());
+}
+
+// Area সেলে ক্লিক করলে ঠিক নিচে ছোট একটা popup-এ Address দেখাবে
+function showAddressPopup(address, el){
+  let pop = document.getElementById('addr-popup');
+  if(!pop){
+    pop = document.createElement('div');
+    pop.id = 'addr-popup';
+    pop.style.cssText = 'position:fixed;z-index:9999;max-width:260px;background:#0d1f5c;color:#fff;padding:10px 14px;border-radius:9px;font-size:.78rem;font-weight:600;font-family:\'Roboto Serif\',serif;box-shadow:0 8px 24px rgba(0,0,0,.35);line-height:1.4;display:none';
+    document.body.appendChild(pop);
+  }
+  pop.innerHTML = '<i class="fas fa-map-marker-alt" style="color:#64b5f6;margin-right:6px"></i>' + (escapeHtml(address) || 'No address entered');
+  const rect = el.getBoundingClientRect();
+  pop.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+  pop.style.left = Math.max(8, Math.min(rect.left + window.scrollX, window.innerWidth - 268)) + 'px';
+  pop.style.display = 'block';
+  setTimeout(()=>{ document.addEventListener('click', hideAddressPopupOnce, {once:true}); },0);
+}
+function hideAddressPopupOnce(){
+  const pop = document.getElementById('addr-popup');
+  if(pop) pop.style.display='none';
+}
+
+// Pending বাটনে ক্লিক করলে — status ইতিমধ্যে pending থাকলে সেভ করা কমেন্ট popup-এ দেখাবে,
+// না থাকলে কারণ/মন্তব্য লেখার জন্য একটা ছোট box (modal) খুলবে
+function handlePendingClick(firebaseKey, el){
+  const t = (window.fiberTeamTickets||[]).find(x=>x.firebaseKey===firebaseKey);
+  const isPendingWithComment = t && (!t.status || t.status==='pending') && t.pendingComment;
+  if(isPendingWithComment){
+    showPendingCommentPopup(t.pendingComment, el);
+  } else {
+    openPendingReasonModal(firebaseKey, t ? (t.pendingComment||'') : '');
+  }
+}
+
+// Pending বাটনে হোভার/ক্লিক করলে সেভ করা কমেন্ট ছোট popup আকারে দেখানো হয়
+function showPendingCommentPopup(comment, el){
+  let pop = document.getElementById('addr-popup');
+  if(!pop){
+    pop = document.createElement('div');
+    pop.id = 'addr-popup';
+    pop.style.cssText = 'position:fixed;z-index:9999;max-width:260px;background:#0d1f5c;color:#fff;padding:10px 14px;border-radius:9px;font-size:.78rem;font-weight:600;font-family:\'Roboto Serif\',serif;box-shadow:0 8px 24px rgba(0,0,0,.35);line-height:1.4;display:none';
+    document.body.appendChild(pop);
+  }
+  pop.innerHTML = '<i class="fas fa-comment-dots" style="color:#facc15;margin-right:6px"></i>' + (comment ? escapeHtml(comment) : 'কোনো মন্তব্য যোগ করা হয়নি');
+  const rect = el.getBoundingClientRect();
+  pop.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+  pop.style.left = Math.max(8, Math.min(rect.left + window.scrollX, window.innerWidth - 268)) + 'px';
+  pop.style.display = 'block';
+  setTimeout(()=>{ document.addEventListener('click', hideAddressPopupOnce, {once:true}); },0);
+}
+
+// Pending সিলেক্ট করার সময় কারণ/মন্তব্য লেখার জন্য modal box
+function openPendingReasonModal(firebaseKey, existingComment){
+  let modal = document.getElementById('pending-reason-modal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'pending-reason-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;padding:16px';
+    modal.innerHTML = `
+      <div style="background:#fff;border-radius:14px;max-width:380px;width:100%;padding:20px;box-shadow:0 20px 50px rgba(0,0,0,.3);font-family:'Montserrat',sans-serif">
+        <div style="font-weight:800;color:#0d1f5c;font-size:1rem;margin-bottom:4px"><i class="fas fa-clock" style="color:#64748b;margin-right:6px"></i>Pending — কারণ লিখুন</div>
+        <div style="font-size:.75rem;color:#64748b;margin-bottom:10px">এই টিকিটটা কেন Pending রাখা হচ্ছে, সংক্ষেপে লিখুন</div>
+        <textarea id="pending-reason-input" rows="4" placeholder="যেমনঃ ক্লায়েন্ট সাইটে নাই, পার্টস লাগবে ইত্যাদি..." style="width:100%;border:1.5px solid #cbd5e1;border-radius:9px;padding:9px 11px;font-family:'Montserrat',sans-serif;font-size:.85rem;resize:vertical;box-sizing:border-box"></textarea>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+          <button id="pending-reason-cancel" style="border:none;background:#eef2f7;color:#334155;font-weight:700;padding:8px 16px;border-radius:8px;cursor:pointer;font-family:'Montserrat',sans-serif">Cancel</button>
+          <button id="pending-reason-ok" style="border:none;background:linear-gradient(135deg,#64748b,#475569);color:#fff;font-weight:700;padding:8px 18px;border-radius:8px;cursor:pointer;font-family:'Montserrat',sans-serif">OK</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e)=>{ if(e.target===modal) closePendingReasonModal(); });
+    modal.querySelector('#pending-reason-cancel').addEventListener('click', closePendingReasonModal);
+    modal.querySelector('#pending-reason-ok').addEventListener('click', confirmPendingReason);
+  }
+  modal.dataset.key = firebaseKey;
+  const input = modal.querySelector('#pending-reason-input');
+  input.value = existingComment || '';
+  modal.style.display = 'flex';
+  setTimeout(()=>input.focus(), 50);
+}
+function closePendingReasonModal(){
+  const modal = document.getElementById('pending-reason-modal');
+  if(modal) modal.style.display = 'none';
+}
+async function confirmPendingReason(){
+  const modal = document.getElementById('pending-reason-modal');
+  const firebaseKey = modal.dataset.key;
+  const comment = modal.querySelector('#pending-reason-input').value.trim();
+  closePendingReasonModal();
+  const ok = await window._fbSetFiberPending(firebaseKey, comment);
+  if(!ok) toast('❌ Pending status update failed! Check connection.');
+}
+
+// Submit করার পর ticket টা এখানে "running" অবস্থায় দেখা যাবে।
+// Done চাপলে সেটা এখান থেকে সরে গিয়ে My Task + All Completed Tasks এ জমা হবে।
+function formatClientName(name){
+  if(!name) return '—';
+  const idx = name.indexOf(':');
+  if(idx === -1) return escapeHtml(toTitleCase(name));
+  const line1 = name.slice(0, idx+1).trim();
+  const line2 = name.slice(idx+1).trim();
+  return `<div style="font-weight:700;color:inherit">${escapeHtml(toTitleCase(line1))}</div><div style="color:inherit;opacity:.8;font-weight:500">${escapeHtml(toTitleCase(line2))}</div>`;
+}
+
+// doneAt টাইমস্ট্যাম্প যদি "আজকের" (লোকাল টাইমজোন অনুযায়ী, রাত ১২টার আগ পর্যন্ত) হয় তাহলে true
+function isSameLocalDay(ts){
+  if(!ts) return false;
+  const a = new Date(ts), b = new Date();
+  return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+}
+
+function renderFiberTeamTickets(){
+  const all = window.fiberTeamTickets || [];
+
+  // রাত ১২টা পার হয়ে যাওয়া পুরোনো "done" টাস্কগুলো এখন চুপচাপ ডিলিট করে দেওয়া হচ্ছে
+  all.forEach(t=>{
+    if(t.status==='done' && !isSameLocalDay(t.doneAt)){
+      window._fbDeleteFiber(t.firebaseKey);
+    }
+  });
+
+  // যেগুলো এখনো active (pending/running) অথবা আজকেই done হয়েছে (রাত ১২টা হওয়ার আগ পর্যন্ত) সেগুলোই দেখানো হবে
+  // Done টাস্কগুলো নিচের দিকে চলে যাবে, active (pending/running) টাস্কগুলো উপরে থাকবে
+  const list = all
+    .filter(t => t.status !== 'done' || isSameLocalDay(t.doneAt))
+    .sort((a,b) => (a.status==='done'?1:0) - (b.status==='done'?1:0));
+  const activeCount = list.filter(t => t.status !== 'done').length;
+
+  // Sidebar badge count (শুধু active task, done বাদে)
+  const badge = document.getElementById('nav-running-count');
+  if(badge){
+    if(activeCount > 0){ badge.style.display='inline-block'; badge.textContent = activeCount; }
+    else { badge.style.display='none'; }
+  }
+
+  const cntEl = document.getElementById('rt-cnt');
+  if(cntEl) cntEl.textContent = activeCount + ' running';
+
+  const tb = document.getElementById('rt-tbody');
+  if(!tb) return;
+
+  if(!list.length){
+    tb.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--muted);font-weight:700">🎉 No running tasks right now!</td></tr>';
+    return;
+  }
+
+  tb.innerHTML = list.map((t,i)=>`
+    <tr class="${t.status==='done'?'rt-row-done':t.status==='running'?'rt-row-running':(!t.status||t.status==='pending')?'rt-row-pending':''}">
+      <td>${i+1}</td>
+      <td style="white-space:nowrap;font-weight:800;color:var(--blue)">${t.tki||'—'}</td>
+      <td>${t.clientCode||'—'}</td>
+      <td>${formatClientName(t.clientName)}</td>
+      <td>${t.contact||'—'}</td>
+      <td><span class="chip chip-cat">${t.clientCat||'—'}</span></td>
+      <td class="rt-area-cell" data-address="${escapeHtml(t.address)}" style="cursor:pointer;color:var(--blue);font-weight:700" title="Click to see address">${t.area?escapeHtml(toTitleCase(t.area)):'—'}<i class="fas fa-map-marker-alt" style="font-size:.55rem;margin-left:4px;opacity:.55"></i></td>
+      <td style="white-space:nowrap;color:#f97316;font-weight:700">${t.fwdDate||'—'}</td>
+      <td style="color:var(--blue);font-weight:700">${t.assignEng||'—'}</td>
+      <td>${t.assignTech||'—'}</td>
+      <td style="white-space:nowrap">
+        ${t.status==='done' ? `
+        <span class="rt-done-badge" style="display:inline-flex;align-items:center;gap:4px;background:#fff9f0;color:#9a3412;font-weight:800;font-size:.6rem;padding:3px 9px;border-radius:20px"><i class="fas fa-check-circle"></i> Done</span>
+        ` : `
+        <div style="display:inline-flex;gap:2px;background:#eef3fb;padding:2px;border-radius:6px">
+          <button onclick="handlePendingClick('${t.firebaseKey}', this)" onmouseenter="if(this.dataset.comment) showPendingCommentPopup(this.dataset.comment, this)" data-comment="${escapeHtml((!t.status||t.status==='pending') ? (t.pendingComment||'') : '')}" class="rt-status-btn" style="${(!t.status||t.status==='pending')?'background:#64748b;color:#fff':'background:transparent;color:#64748b'}">Pending${((!t.status||t.status==='pending') && t.pendingComment) ? ' <i class="fas fa-comment-dots"></i>' : ''}</button>
+          <button onclick="setFiberStatus('${t.firebaseKey}','running')" class="rt-status-btn ${t.status==='running'?'rt-running-live':''}" style="${t.status==='running'?'':'background:transparent;color:#f97316'}">Running</button>
+          <button onclick="markFiberTaskDone('${t.firebaseKey}')" class="rt-status-btn" style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff"><i class="fas fa-check"></i> Done</button>
+        </div>
+        `}
+      </td>
+    </tr>`).join('');
+
+  if(!tb._addrListenerAdded){
+    tb.addEventListener('click', function(e){
+      const cell = e.target.closest('.rt-area-cell');
+      if(cell){ e.stopPropagation(); showAddressPopup(cell.dataset.address, cell); }
+    });
+    tb._addrListenerAdded = true;
+  }
+}
+
+async function setFiberStatus(firebaseKey, status){
+  const ok = await window._fbSetFiberStatus(firebaseKey, status);
+  if(!ok) toast('❌ Status update failed! Check connection.');
+}
+
+// pickCdd() একটা checkbox element আশা করে — কোড থেকে সরাসরি ভ্যালু বসাতে এই হেল্পার ব্যবহার হবে
+function setCddByValue(key, value){
+  const nameMap={'cat':'cat','tt':'tasktype','tm':'team'};
+  const cb = document.querySelector('input[name="f-'+nameMap[key]+'"][value="'+value+'"]');
+  if(cb){ cb.checked = true; pickCdd(key, cb); }
+}
+
+// Done চাপলে সাথে সাথেই submit হবে না — বরং প্রয়োজনীয় ডেটা (Ticket ID, Remarks-এ ক্লায়েন্ট/এড্রেস/কন্টাক্ট ইনফো)
+// নিয়ে Ticket Entry (Daily) ফর্মে চলে যাবে, বাকি ফিল্ড (Category, Task Type, Team, Engineer, BNOC, MAC, WiFi)
+// ইউজার নিজে বেছে দেবে, তারপর Submit করলে সেটা All Completed Tasks সহ যেখানে যাওয়ার কথা সব জায়গায় চলে যাবে।
+function markFiberTaskDone(firebaseKey){
+  const t = (window.fiberTeamTickets||[]).find(x=>x.firebaseKey===firebaseKey);
+  if(!t){ toast('❌ Task not found!'); return; }
+
+  // এই fiber task টা পেন্ডিং রাখা হচ্ছে — Daily ফর্ম সফলভাবে সাবমিট হলে তবেই এটা running list থেকে মুছে যাবে
+  window._fiberDonePendingKey = firebaseKey;
+
+  document.getElementById('f-ticket').value = t.tki || '';
+  document.getElementById('f-remarks').value = `Fiber Team Ticket — Client: ${t.clientName||''} (Code: ${t.clientCode||''}), Address: ${t.address||''}, Area: ${t.area||''}, Contact: ${t.contact||''}, Technician: ${t.assignTech||'—'}, Forward/Last Update: ${t.fwdDate||'—'}`;
+  if(t.assignEng){
+    const engSel = document.getElementById('f-eng');
+    if(engSel && Array.from(engSel.options).some(o=>o.value===t.assignEng)) engSel.value = t.assignEng;
+  }
+  if(t.assignTech){
+    const techSel = document.getElementById('f-tech');
+    if(techSel && Array.from(techSel.options).some(o=>o.value===t.assignTech)) techSel.value = t.assignTech;
+  }
+  if(!document.getElementById('f-date').value){
+    document.getElementById('f-date').value = new Date().toLocaleDateString('en-CA');
+  }
+
+  // Task Type সবসময় "Back office support" ডিফল্ট থাকবে, যা Team Type-কে Single Technician/FI Team এ ফিল্টার করে দেয়
+  setCddByValue('tt','Back office support');
+  // এরপর Team Type ডিফল্ট "FI Team" সিলেক্ট হবে
+  setCddByValue('tm','FI Team');
+
+  // Ticket ID প্রিফিক্স অনুযায়ী Task Category ডিফল্ট সিলেক্ট হবে
+  const tki = (t.tki||'').toUpperCase();
+  let defaultCat = '';
+  if(tki.startsWith('L3-')) defaultCat = 'Troubleshoot';
+  else if(tki.startsWith('TKI')) defaultCat = 'Installation';
+  else if(tki.startsWith('CR-')) defaultCat = 'CR';
+  if(defaultCat) setCddByValue('cat', defaultCat);
+
+  const navDash = document.querySelector('.nav-item[onclick^="showPage(\'dashboard\'"]');
+  showPage('dashboard', navDash);
+  switchDashTab('daily');
+  toast('ℹ️ Ticket ID ও Remarks বসানো হয়েছে — বাকি তথ্য দিয়ে Submit করুন।');
+}
+
 async function submitTicket(){
   const d=document.getElementById('f-date').value;
   const rawTicket=document.getElementById('f-ticket').value.trim();
@@ -2322,6 +3098,7 @@ async function submitTicket(){
     const ticketData={
       id:Date.now()+Math.random(),
       date:d,ticket:ti,cat,tt,tm,eng,
+      tech:document.getElementById('f-tech').value,
       bnoc:document.getElementById('f-bnoc').value,
       mac:document.getElementById('f-mac').value.trim(),
       wifi:document.getElementById('f-wifi').value,
@@ -2339,7 +3116,16 @@ async function submitTicket(){
  if(successCount>0){
     // শুধু Ticket ID, MAC, Remarks reset হবে
     // Category, Task Type, Team Type, Engineer, BNOC, WiFi same থাকবে
-    ['f-ticket','f-mac','f-remarks'].forEach(i=>document.getElementById(i).value='');
+    ['f-ticket','f-mac','f-remarks','f-tech'].forEach(i=>document.getElementById(i).value='');
+
+    // Fiber Team Ticket থেকে "Done" চেপে এখানে আসা হলে, সাবমিট সফল হওয়ার পরই
+    // Running Task Dashboard থেকে সেই টিকিটটা সরিয়ে দেওয়া হবে
+    if(window._fiberDonePendingKey){
+      const doneKey = window._fiberDonePendingKey;
+      window._fiberDonePendingKey = null;
+      const ok2 = await window._fbMarkFiberDone(doneKey);
+      if(ok2) toast('✅ Fiber task completed & moved to All Completed Tasks! (রাত ১২টা পর্যন্ত Running Task-এ দেখা যাবে)');
+    }
   }
 
   if(failCount===0){
@@ -2578,6 +3364,7 @@ function mtGoPage(p){
 }
 
 const ENGINEERS = ['Ahsanul Kabir','Tamim','Amit Hasan','Rupchan','Nazrul Islam','Basudeb Roy','ATM Arifuzzaman','Maruf Hasan','Abu Sayed'];
+const TECHNICIANS = ['Rone','Milon','Raju','Tipu','Alamin','Rabin','Maruf','Alal','Sujon','A.Latif','Ibrahim','Ratul','Nazmul'];
 const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -2686,6 +3473,84 @@ function renderReport(){
     <td style="text-align:center;font-weight:900;color:#15803d;font-family:'Outfit',sans-serif;font-size:1.3rem;background:rgba(22,163,74,.15)">${totalTW}</td>
     <td style="text-align:center;font-weight:900;color:#15803d;font-family:'Outfit',sans-serif;font-size:1.3rem">${totalPS}</td>
   </tr>`;
+
+  renderTechReport(ranged, df, dt);
+}
+
+// টেকনিশিয়ান ওয়াইজ Task Report — Troubleshoot, CR, Installation & Total কলাম
+function renderTechReport(ranged, df, dt){
+  const tb = document.getElementById('tr-tech-tbody');
+  if(!tb) return;
+
+  const tbadge = document.getElementById('tr-tech-period-badge');
+  if(tbadge){
+    if(df&&dt){ tbadge.textContent=`${fmtDateDisp(df)} → ${fmtDateDisp(dt)}`; }
+    else if(df){ tbadge.textContent=`From ${fmtDateDisp(df)}`; }
+    else if(dt){ tbadge.textContent=`Until ${fmtDateDisp(dt)}`; }
+    else { tbadge.textContent='All Time'; }
+  }
+
+  let totalTS=0,totalCR=0,totalIN=0,totalTW=0;
+
+  tb.innerHTML = TECHNICIANS.map(tech=>{
+    const tt2 = ranged.filter(t=>t.tech===tech);
+    const ts = tt2.filter(t=>t.cat==='Troubleshoot').length;
+    const cr = tt2.filter(t=>t.cat==='CR').length;
+    const ins = tt2.filter(t=>t.cat==='Installation').length;
+    const tw = ts+cr+ins;
+    totalTS+=ts;totalCR+=cr;totalIN+=ins;totalTW+=tw;
+
+    const cell=(v)=>`<td style="text-align:center;font-family:'Outfit',sans-serif;padding:3px 4px;">
+  <span style="display:inline-flex;align-items:center;justify-content:center;width:25px;height:25px;border-radius:50%;font-size:.82rem;font-weight:800;
+  background:${v>0?'linear-gradient(135deg,#fed7aa,#fdba74)':'#f1f5f9'};
+  color:${v>0?'#c2410c':'#b0bec5'};
+  border:1.5px solid ${v>0?'#fb923c':'#e2e8f0'};">${v}</span></td>`;
+
+    return `<tr>
+      <td style="font-weight:800;font-family:'Outfit',sans-serif;color:var(--navy);font-size:1rem;padding:4px 10px;">${tech}</td>
+      ${cell(ts)}${cell(cr)}${cell(ins)}
+      <td style="text-align:center;font-family:'Outfit',sans-serif;padding:3px 4px;">
+  <span style="display:inline-flex;align-items:center;justify-content:center;width:25px;height:25px;height:32px;border-radius:50%;font-size:.9rem;font-weight:900;
+  background:${tw>0?'linear-gradient(135deg,#fed7aa,#fdba74)':'#f1f5f9'};
+  color:${tw>0?'#c2410c':'#90a4ae'};
+  border:2px solid ${tw>0?'#fb923c':'#e2e8f0'};">${tw}</span></td>
+    </tr>`;
+  }).join('');
+
+  tb.innerHTML += `<tr style="background:linear-gradient(90deg,#fff7ed,#ffedd5);border-top:2px solid #c2410c">
+    <td style="font-weight:900;font-family:'Outfit',sans-serif;color:#7c2d12;font-size:.84rem;letter-spacing:.5px">TOTAL</td>
+    <td style="text-align:center;font-weight:900;color:#c2410c;font-family:'Outfit',sans-serif;font-size:1.3rem">${totalTS}</td>
+    <td style="text-align:center;font-weight:900;color:#c2410c;font-family:'Outfit',sans-serif;font-size:1.3rem">${totalCR}</td>
+    <td style="text-align:center;font-weight:900;color:#c2410c;font-family:'Outfit',sans-serif;font-size:1.3rem">${totalIN}</td>
+    <td style="text-align:center;font-weight:900;color:#c2410c;font-family:'Outfit',sans-serif;font-size:1.3rem;background:rgba(194,65,12,.15)">${totalTW}</td>
+  </tr>`;
+}
+
+// Task Report পেজে Engineer/Technician ট্যাব সুইচ করার ফাংশন
+function switchReportView(view){
+  const engBtn = document.getElementById('tr-tab-eng');
+  const techBtn = document.getElementById('tr-tab-tech');
+  const engView = document.getElementById('tr-view-eng');
+  const techView = document.getElementById('tr-view-tech');
+  if(view==='tech'){
+    techView.style.display = '';
+    engView.style.display = 'none';
+    techBtn.style.background = 'linear-gradient(135deg,#7c2d12,#f97316)';
+    techBtn.style.color = '#fff';
+    techBtn.style.boxShadow = '0 3px 8px rgba(249,115,22,.3)';
+    engBtn.style.background = '#eef3fb';
+    engBtn.style.color = '#334155';
+    engBtn.style.boxShadow = 'none';
+  } else {
+    engView.style.display = '';
+    techView.style.display = 'none';
+    engBtn.style.background = 'linear-gradient(135deg,#0d1f5c,#2196f3)';
+    engBtn.style.color = '#fff';
+    engBtn.style.boxShadow = '0 3px 8px rgba(33,150,243,.3)';
+    techBtn.style.background = '#eef3fb';
+    techBtn.style.color = '#334155';
+    techBtn.style.boxShadow = 'none';
+  }
 }
 
 function clearAtDates(){
