@@ -221,6 +221,17 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzLrnx5cLKn1jP1W4sEK
     }
   };
 
+  // পুরো Fiber Team Tickets ডেটা (Running Task Dashboard/Fiber Task এর সব রেকর্ড) একসাথে মুছে ফেলার জন্য — Admin only
+  window._fbClearAllFiber = async function() {
+    try {
+      await remove(fiberTeamTicketsRef);
+      return true;
+    } catch(e) {
+      console.error(e);
+      return false;
+    }
+  };
+
   window._fbSetFiberStatus = async function(firebaseKey, status) {
     try {
       await set(ref(db, 'fiberTeamTickets/' + firebaseKey + '/status'), status);
@@ -1267,7 +1278,7 @@ tbody tr:hover td{background:#f0f8ff}
         <div class="form-grid">
           <div class="fg fg-full">
             <label><i class="fas fa-paste"></i>Paste Ticket Data (auto-fill)</label>
-            <textarea id="ft-pastebox" placeholder="Plz copy from Ref No to Area portion Data and paste here" rows="3" oninput="autoFillFiberTicket()"></textarea>
+            <textarea id="ft-pastebox" placeholder="এখানে সিস্টেম থেকে কপি করা পুরো লাইনটা পেস্ট করুন... Ticket ID, Client Code, Client Name, Client Category, Date, Area, Phone Number আপনা-আপনি বসে যাবে।" rows="3" oninput="autoFillFiberTicket()"></textarea>
           </div>
           <div class="fg"><label><i class="fas fa-hashtag"></i>Ticket ID</label>
             <input type="text" id="ft-tki" placeholder="Enter Ticket ID">
@@ -1360,6 +1371,7 @@ tbody tr:hover td{background:#f0f8ff}
           <div class="page-ttl"><i class="fas fa-tasks"></i>Fiber Task</div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span class="tbl-badge" id="rt-cnt">0 running</span>
+            <button id="btn-clear-fiber" onclick="clearAllFiberData()" style="display:none;align-items:center;gap:6px;padding:0 14px;height:30px;background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;border:none;border-radius:7px;font-size:.65rem;font-weight:800;cursor:pointer;font-family:'Montserrat',sans-serif;box-shadow:0 3px 8px rgba(220,38,38,.28)"><i class="fas fa-trash-alt"></i> Clear All Fiber Data</button>
           </div>
         </div>
       </div>
@@ -1897,6 +1909,12 @@ function setupUserUI() {
   const excelBtn = document.getElementById('btn-excel-export');
   if (excelBtn) {
     excelBtn.style.display = canExcelDownload() ? 'flex' : 'none';
+  }
+
+  // Clear All Fiber Data button: admin only
+  const clearFiberBtn = document.getElementById('btn-clear-fiber');
+  if (clearFiberBtn) {
+    clearFiberBtn.style.display = isAdmin ? 'flex' : 'none';
   }
 // Inventory popup - শুধু নির্দিষ্ট user দের জন্য
 const invUsers = ['admin', 'ahsan', 'tamim', 'amit', 'rupchan'];
@@ -2994,6 +3012,25 @@ function renderFiberTeamTickets(){
 async function setFiberStatus(firebaseKey, status){
   const ok = await window._fbSetFiberStatus(firebaseKey, status);
   if(!ok) toast('❌ Status update failed! Check connection.');
+}
+
+// Fiber Task (Running Task Dashboard) এর সব ডেটা একসাথে মুছে ফেলার ফাংশন — শুধুমাত্র Admin ব্যবহার করতে পারবে
+async function clearAllFiberData(){
+  if(!currentUser || currentUser.role !== 'admin'){ toast('❌ Permission denied! শুধুমাত্র Admin এই কাজটি করতে পারবেন।'); return; }
+  const total = (window.fiberTeamTickets||[]).length;
+  if(total === 0){ toast('ℹ️ Fiber Task-এ ইতিমধ্যে কোনো ডেটা নেই।'); return; }
+  if(!confirm(`⚠️ আপনি কি নিশ্চিত? Fiber Task-এর সবগুলো (${total}টি) রেকর্ড স্থায়ীভাবে মুছে যাবে — এটি Undo করা যাবে না!`)) return;
+  if(!confirm('শেষবারের মতো নিশ্চিত করুন — সত্যিই সব Fiber Task ডেটা ডিলিট করতে চান?')) return;
+
+  const btn = document.getElementById('btn-clear-fiber');
+  if(btn){ btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...'; }
+
+  const ok = await window._fbClearAllFiber();
+
+  if(btn){ btn.disabled = false; btn.innerHTML = '<i class="fas fa-trash-alt"></i> Clear All Fiber Data'; }
+
+  if(ok) toast(`✅ Fiber Task-এর সবগুলো (${total}টি) রেকর্ড সফলভাবে মুছে ফেলা হয়েছে!`);
+  else toast('❌ ডিলিট করতে ব্যর্থ হয়েছে! Connection চেক করুন।');
 }
 
 // pickCdd() একটা checkbox element আশা করে — কোড থেকে সরাসরি ভ্যালু বসাতে এই হেল্পার ব্যবহার হবে
